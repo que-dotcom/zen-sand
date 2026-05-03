@@ -499,8 +499,9 @@ function updateLightning(engine, x, y) {
 
   if (cx !== x || cy !== y) {
     // 旧位置をSPARKトレイルに
-    engine.cells[i]  = SPARK;
-    engine.colors[i] = 0xCCEEFF;
+    engine.cells[i]  = EMPTY;
+    engine.colors[i] = 0;
+    engine.meta[i]   = 0;
 
     // 新位置に雷を配置
     const ni = engine.idx(cx, cy);
