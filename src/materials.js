@@ -434,51 +434,90 @@ function updateMetal(engine, x, y) {
   }
 }
 
-function updateLightning(engine, x, y) {
-  const i = engine.idx(x, y);
-
-  // Initialize TTL on first frame (meta=0 means fresh)
-  if (engine.meta[i] === 0) engine.meta[i] = 3 + Math.floor(Math.random() * 3);
-
-  // React with every adjacent cell
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx,dy] of nb4) {
+// 雷の隣接反応ヘルパー（進行中・着地点で共用）
+function _lightningReact(engine, x, y) {
+  const dirs = [[0,1],[1,0],[-1,0],[0,-1]];
+  for (const [dx,dy] of dirs) {
     const nx = x+dx, ny = y+dy;
     const n  = engine.get(nx, ny);
     const ni = engine.idx(nx, ny);
-
-    if (n === METAL) {
-      // Instant chain through metal — do NOT mark updated so it propagates this frame
-      if (engine.meta[ni] === 0) { // only if not already electrified
-        engine.cells[ni]  = LIGHTNING;
-        engine.colors[ni] = MATERIALS[LIGHTNING].colors[Math.floor(Math.random() * MATERIALS[LIGHTNING].colors.length)];
-        engine.meta[ni]   = engine.meta[i]; // inherit TTL
-      }
+    if (n === METAL && engine.meta[ni] === 0) {
+      engine.cells[ni]  = LIGHTNING;
+      engine.colors[ni] = MATERIALS[LIGHTNING].colors[Math.floor(Math.random() * MATERIALS[LIGHTNING].colors.length)];
+      engine.meta[ni]   = 5 + Math.floor(Math.random() * 3);
     } else if (n === WATER) {
-      // Spark spreads through water over several frames
-      engine.cells[ni]    = SPARK;
-      engine.colors[ni]   = MATERIALS[SPARK].colors[Math.floor(Math.random() * MATERIALS[SPARK].colors.length)];
-      engine.updated[ni]  = 1; // prevent same-frame chain (visual wave effect)
+      engine.cells[ni]   = SPARK;
+      engine.colors[ni]  = MATERIALS[SPARK].colors[Math.floor(Math.random() * MATERIALS[SPARK].colors.length)];
+      engine.updated[ni] = 1;
     } else if (n === SAND   && Math.random() > 0.25) { engine.set(nx, ny, GLASS); }
     else if (n === OIL)                               { engine.set(nx, ny, FIRE);  }
     else if (n === COAL)                              { engine.set(nx, ny, FIRE);  }
     else if (n === SNOW)                              { engine.set(nx, ny, WATER); }
-    else if (n === SOIL)                              { engine.set(nx, ny, SAND);  }  // dry out
+    else if (n === SOIL)                              { engine.set(nx, ny, SAND);  }
     else if (n === PLANT  || n === DARK_PLANT ||
              n === FLOWER || n === DARK_FLOWER)       { engine.set(nx, ny, FIRE);  }
     else if (n === FUNGUS || n === GLOW_FUNGUS)       { engine.set(nx, ny, GLOW_FUNGUS); }
     else if (n === SEED)                              { engine.set(nx, ny, ASH);   }
   }
-
-  // Count down TTL
-  engine.meta[i]--;
-  if (engine.meta[i] <= 0) {
-    engine.cells[i]  = EMPTY;
-    engine.colors[i] = 0;
-    engine.meta[i]   = 0;
-  }
 }
 
+function updateLightning(engine, x, y) {
+  const i = engine.idx(x, y);
+  if (engine.meta[i] === 0) engine.meta[i] = 5 + Math.floor(Math.random() * 4);
+
+  // 上から下へ高速落下（最大4セル/frame）＋ジグザグ
+  const SPEED  = 4;
+  const zigDir = Math.random() > 0.5 ? 1 : -1;
+  let cx = x, cy = y;
+
+  for (let step = 0; step < SPEED; step++) {
+    let nx = cx, ny = cy + 1;
+    if (!engine.inBounds(nx, ny)) break;
+
+    // 30%の確率でジグザグ
+    if (Math.random() > 0.7 && engine.inBounds(cx + zigDir, cy + 1)
+        && engine.get(cx + zigDir, cy + 1) === EMPTY) {
+      nx = cx + zigDir;
+    } else if (engine.get(cx, cy + 1) !== EMPTY) {
+      // 直下が塞がれていたら斜め下を試みる
+      if (engine.inBounds(cx + zigDir, cy + 1) && engine.get(cx + zigDir, cy + 1) === EMPTY) {
+        nx = cx + zigDir;
+      } else if (engine.inBounds(cx - zigDir, cy + 1) && engine.get(cx - zigDir, cy + 1) === EMPTY) {
+        nx = cx - zigDir;
+      } else {
+        break;
+      }
+    }
+
+    if (engine.get(nx, ny) !== EMPTY) break;
+
+    // 通過点の左右に反応チェック
+    _lightningReact(engine, nx, ny);
+
+    cx = nx; cy = ny;
+  }
+
+  if (cx !== x || cy !== y) {
+    // 旧位置をSPARKトレイルに
+    engine.cells[i]  = SPARK;
+    engine.colors[i] = 0xCCEEFF;
+
+    // 新位置に雷を配置
+    const ni = engine.idx(cx, cy);
+    engine.cells[ni]  = LIGHTNING;
+    engine.colors[ni] = MATERIALS[LIGHTNING].colors[Math.floor(Math.random() * MATERIALS[LIGHTNING].colors.length)];
+    engine.meta[ni]   = 5 + Math.floor(Math.random() * 4);
+    engine.updated[ni] = 1;
+    _lightningReact(engine, cx, cy);
+  } else {
+    // 動けない：反応して消滅カウントダウン
+    _lightningReact(engine, x, y);
+    engine.meta[i]--;
+    if (engine.meta[i] <= 0) {
+      engine.cells[i] = EMPTY; engine.colors[i] = 0; engine.meta[i] = 0;
+    }
+  }
+}
 function updateSpark(engine, x, y) {
   // Fade back to water quickly
   if (Math.random() > 0.82) { engine.set(x, y, WATER); return; }
