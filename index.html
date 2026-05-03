@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Zen Sand</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="ui">
+    <div id="toolbar"></div>
+    <div id="brush-controls">
+      <span class="ui-label">ブラシ</span>
+      <input type="range" id="brush-size" min="1" max="8" value="3">
+    </div>
+    <button id="rain-btn" class="icon-btn" title="雨モード（トグル）">☁</button>
+    <button id="clear-btn">クリア</button>
+  </div>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
