@@ -188,6 +188,16 @@ function updateCoal(engine, x, y) {
 
 // ─── Life & growth update functions ──────────────────────────────────────────
 
+function updateSoil(engine, x, y) {
+  // 砂と同じ重力挙動（落下・積み上げ）
+  const below = engine.get(x, y+1);
+  if (below === EMPTY || below === WATER) { engine.swap(x, y, x, y+1); return; }
+  const dir = Math.random() > 0.5 ? 1 : -1;
+  const dA = engine.get(x+dir, y+1), dB = engine.get(x-dir, y+1);
+  if (dA === EMPTY || dA === WATER) { engine.swap(x, y, x+dir, y+1); return; }
+  if (dB === EMPTY || dB === WATER) { engine.swap(x, y, x-dir, y+1); return; }
+}
+
 function updateSeed(engine, x, y) {
   // Fall like sand
   const below = engine.get(x, y+1);
@@ -197,7 +207,7 @@ function updateSeed(engine, x, y) {
   if (dA === EMPTY || dA === WATER) { engine.swap(x, y, x+dir, y+1); return; }
   if (dB === EMPTY || dB === WATER) { engine.swap(x, y, x-dir, y+1); return; }
 
-  if (Math.random() > 0.015) return; // slow germination check
+  if (Math.random() > 0.04) return; // germination check（緩和）
 
   // Heat kills seed
   const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
@@ -207,17 +217,20 @@ function updateSeed(engine, x, y) {
   }
 
   // Must rest on solid ground
-  const onGround = [SOIL,SAND,STONE,WALL,GLASS,COAL].includes(below);
+  const onGround = [SOIL,SAND,STONE,WALL,GLASS,COAL,ASH].includes(below);
   if (!onGround) return;
 
-  // Scan nearby for water and oil
+  // 半径3セル以内の水・油を探索（範囲拡大）
   let hasWater = false, hasOil = false;
-  const scanDirs = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
-  for (const [dx,dy] of scanDirs) {
-    const n = engine.get(x+dx, y+dy);
-    if (n === WATER || n === SOIL) hasWater = true;
-    if (n === OIL)                 hasOil   = true;
+  for (let dy = -3; dy <= 3; dy++) {
+    for (let dx = -3; dx <= 3; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const n = engine.get(x+dx, y+dy);
+      if (n === WATER || n === SOIL) hasWater = true;
+      if (n === OIL)                 hasOil   = true;
+    }
   }
+  // 土の上なら水なしでも発芽可能
   if (!hasWater && below !== SOIL) return;
 
   // Germinate
@@ -251,9 +264,13 @@ function updatePlant(engine, x, y) {
 
   if (engine.get(x, y-1) !== EMPTY) return; // blocked above
 
-  const meta     = engine.meta[i];
-  const hasWater = nb4.some(([dx,dy]) => engine.get(x+dx, y+dy) === WATER);
-  if (!hasWater && Math.random() > 0.45) return;
+  const meta = engine.meta[i];
+  // 半径2セル以内の水を探索
+  let hasWater = false;
+  for (let dy = -2; dy <= 2 && !hasWater; dy++)
+    for (let dx = -2; dx <= 2 && !hasWater; dx++)
+      if (engine.get(x+dx, y+dy) === WATER) hasWater = true;
+  if (!hasWater && Math.random() > 0.3) return;
 
   // Estimate height by scanning downward
   let height = 0;
@@ -410,7 +427,7 @@ export const MATERIALS = {
   [COAL]:        { name: 'coal',        colors: [0x222222,0x1A1A1A,0x2A2A2A,0x1E1E1E,0x252525],                       update: updateCoal      },
   [STONE]:       { name: 'stone',       colors: [0x5A5A5A,0x4E4E4E,0x686868,0x525252,0x606060],                       update: null            },
   [GLASS]:       { name: 'glass',       colors: [0xB8E0FF,0xC0E8FF,0xA8D8F0,0xCCEEFF,0xD0F0FF],                       update: null            },
-  [SOIL]:        { name: 'soil',        colors: [0x5C3D1E,0x4A2E12,0x6B4A28,0x523518,0x3E2810],                       update: null            },
+  [SOIL]:        { name: 'soil',        colors: [0x5C3D1E,0x4A2E12,0x6B4A28,0x523518,0x3E2810],                       update: updateSoil      },
   [SEED]:        { name: 'seed',        colors: [0xA8C060,0x90A840,0xB8D070,0x98B848,0xC0D878],                       update: updateSeed      },
   [PLANT]:       { name: 'plant',       colors: [0x3D7A25,0x4A8A2C,0x52A030,0x2D5A1B,0x5AB038],                       update: updatePlant     },
   [DARK_PLANT]:  { name: 'dark_plant',  colors: [0x1A081A,0x220A22,0x2A0A2A,0x300A30,0x1E081E],                       update: updateDarkPlant },
