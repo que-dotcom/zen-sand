@@ -23,6 +23,7 @@ export const DARK_FLOWER = 20;
 export const METAL       = 21;
 export const LIGHTNING   = 22;
 export const SPARK       = 23;
+export const RUST        = 24;
 
 // ─── Plant meta encoding (Uint8) ──────────────────────────────────────────────
 // bits 0-2: flower color index (0-7)
@@ -415,6 +416,17 @@ function updateGlowFungus(engine, x, y) {
   }
 }
 
+
+function updateRust(engine, x, y) {
+  // 落下しない（固体）
+  // 雷 → 砂に崩壊、溶岩 → 溶解
+  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
+  for (const [dx,dy] of nb4) {
+    const n = engine.get(x+dx, y+dy);
+    if (n === LIGHTNING) { engine.set(x, y, SAND); return; }
+    if (n === LAVA)      { engine.set(x, y, LAVA); return; }
+  }
+}
 // ─── Electricity update functions ────────────────────────────────────────────
 
 function updateMetal(engine, x, y) {
@@ -430,6 +442,12 @@ function updateMetal(engine, x, y) {
   for (const [dx,dy] of nb4) {
     if (engine.get(x+dx, y+dy) === LAVA && Math.random() > 0.94) {
       engine.set(x, y, LAVA); return;
+    }
+  }
+  // 水に長時間接触 → 錆
+  if (Math.random() > 0.998) {
+    for (const [dx,dy] of nb4) {
+      if (engine.get(x+dx, y+dy) === WATER) { engine.set(x, y, RUST); return; }
     }
   }
 }
@@ -450,13 +468,43 @@ function _lightningReact(engine, x, y) {
       engine.colors[ni]  = MATERIALS[SPARK].colors[Math.floor(Math.random() * MATERIALS[SPARK].colors.length)];
       engine.updated[ni] = 1;
     } else if (n === SAND   && Math.random() > 0.25) { engine.set(nx, ny, GLASS); }
-    else if (n === OIL)                               { engine.set(nx, ny, FIRE);  }
+    else if (n === OIL) {
+      // 爆発: 半径4のFIRE広範囲生成（油田爆破）
+      const r = 4;
+      for (let ey = -r; ey <= r; ey++) for (let ex = -r; ex <= r; ex++) {
+        if (ex*ex + ey*ey > r*r) continue;
+        const en = engine.get(nx+ex, ny+ey);
+        if (en === EMPTY || en === OIL || en === SMOKE) engine.set(nx+ex, ny+ey, FIRE);
+      }
+    }
     else if (n === COAL)                              { engine.set(nx, ny, FIRE);  }
     else if (n === SNOW)                              { engine.set(nx, ny, WATER); }
     else if (n === SOIL)                              { engine.set(nx, ny, SAND);  }
-    else if (n === PLANT  || n === DARK_PLANT ||
-             n === FLOWER || n === DARK_FLOWER)       { engine.set(nx, ny, FIRE);  }
-    else if (n === FUNGUS || n === GLOW_FUNGUS)       { engine.set(nx, ny, GLOW_FUNGUS); }
+    else if (n === RUST)                              { engine.set(nx, ny, SAND);  } // 錆が砂に崩壊
+    else if (n === PLANT || n === FLOWER || n === DARK_FLOWER) { engine.set(nx, ny, FIRE); }
+    else if (n === DARK_PLANT) {
+      // F+: 激しく発火 + 8方向に飛び火
+      engine.set(nx, ny, FIRE);
+      const sd = [[0,1],[1,0],[-1,0],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
+      for (const [sdx,sdy] of sd) {
+        const sn = engine.get(nx+sdx, ny+sdy);
+        if (sn === EMPTY || sn === OIL || sn === PLANT || sn === FLOWER) engine.set(nx+sdx, ny+sdy, FIRE);
+      }
+    }
+    else if (n === FUNGUS) { engine.set(nx, ny, GLOW_FUNGUS); }
+    else if (n === GLOW_FUNGUS) {
+      // 超発光バースト → 消滅
+      const br = 3;
+      for (let by = -br; by <= br; by++) for (let bx = -br; bx <= br; bx++) {
+        if (bx*bx + by*by > br*br) continue;
+        const bn = engine.get(nx+bx, ny+by);
+        if (bn === EMPTY || bn === GLOW_FUNGUS || bn === FUNGUS) {
+          const bi = engine.idx(nx+bx, ny+by);
+          engine.cells[bi] = SPARK; engine.colors[bi] = 0x00FFDD; engine.updated[bi] = 1;
+        }
+      }
+      engine.set(nx, ny, EMPTY);
+    }
     else if (n === SEED)                              { engine.set(nx, ny, ASH);   }
   }
 }
@@ -563,4 +611,5 @@ export const MATERIALS = {
   [METAL]:       { name: 'metal',       colors: [0xB0B8C8,0x909AAA,0xC0C8D8,0xA0A8B8,0x8090A0,0xC8D0E0],              update: updateMetal     },
   [LIGHTNING]:   { name: 'lightning',   colors: [0xFFFFFF,0xEEEEFF,0xCCDDFF,0xAABBFF,0xDDEEFF,0xFFFFEE],              update: updateLightning },
   [SPARK]:       { name: 'spark',       colors: [0x88CCFF,0xAADDFF,0x66BBEE,0xCCEEFF,0x99DDFF,0x55AAEE],              update: updateSpark     },
+  [RUST]:        { name: 'rust',        colors: [0x8B4513,0xA0522D,0xCD853F,0x7B3A0A,0xB05A28],                       update: updateRust      },
 };
