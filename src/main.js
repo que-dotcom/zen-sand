@@ -3,7 +3,7 @@ import { Renderer }     from './renderer.js';
 import { InputHandler } from './input.js';
 import { EMPTY, SAND, WATER, WALL, SNOW, FIRE, OIL, LAVA, COAL,
          SOIL, SEED, FUNGUS, METAL, LIGHTNING,
-         STEAM, ACID, MUD, ICE } from './materials.js';
+         STEAM, ACID, MUD, ICE, HARD_SOIL } from './materials.js';
 
 const CELL_SIZE = 4;
 
@@ -19,7 +19,8 @@ const PALETTE = [
   { id: COAL,   label: '炭',   color: '#333333', key: '7' },
   { id: WALL,   label: '壁',   color: '#888888', key: '8' },
   // 生命系
-  { id: SOIL,   label: '土',   color: '#5C3D1E', key: 'q' },
+  { id: SOIL,      label: '土(落)', color: '#5C3D1E', key: 'q' },
+  { id: HARD_SOIL, label: '土(固)', color: '#6B4A28', key: 'a' },
   { id: SEED,   label: '種',   color: '#A8C060', key: 'w' },
   { id: FUNGUS, label: '菌',   color: '#4A2060', key: 'e' },
   // 電気系

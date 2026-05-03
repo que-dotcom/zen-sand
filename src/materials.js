@@ -28,6 +28,7 @@ export const STEAM       = 25;
 export const ACID        = 26;
 export const MUD         = 27;
 export const ICE         = 28;
+export const HARD_SOIL   = 29; // 静的な土（描画スタイル）
 
 // ─── Plant meta encoding (Uint8) ──────────────────────────────────────────────
 // bits 0-2: flower color index (0-7)
@@ -258,22 +259,28 @@ function updateSeed(engine, x, y) {
   }
 
   // Must rest on solid ground
-  const onGround = [SOIL,SAND,STONE,WALL,GLASS,COAL,ASH].includes(below);
+  const onGround = [SOIL,SAND,STONE,WALL,GLASS,COAL,ASH,HARD_SOIL].includes(below);
   if (!onGround) return;
 
-  // 半径3セル以内の水・油・蒸気を探索
+  // 半径3セル以内の水・油を探索
   let hasWater = false, hasOil = false, hasSteamS = false;
   for (let dy = -3; dy <= 3; dy++) {
     for (let dx = -3; dx <= 3; dx++) {
       if (dx === 0 && dy === 0) continue;
       const n = engine.get(x+dx, y+dy);
-      if (n === WATER || n === SOIL) hasWater = true;
-      if (n === OIL)                 hasOil   = true;
-      if (n === STEAM)               hasSteamS = true;
+      if (n === WATER || n === SOIL || n === HARD_SOIL) hasWater = true;
+      if (n === OIL)                                    hasOil   = true;
+      if (n === STEAM)                                  hasSteamS = true;
     }
   }
-  // 土/泥の上 or 水/蒸気があれば発芽可能
-  if (!hasWater && !hasSteamS && below !== SOIL && below !== MUD) return;
+  // 蒸気は上方向に広域探索（蒸気は上昇するため遠くても有効）
+  if (!hasSteamS) {
+    for (let dy = -10; dy <= 1 && !hasSteamS; dy++)
+      for (let dx = -6; dx <= 6 && !hasSteamS; dx++)
+        if (engine.get(x+dx, y+dy) === STEAM) hasSteamS = true;
+  }
+  // 土/泥/固土の上 or 水/蒸気があれば発芽可能
+  if (!hasWater && !hasSteamS && below !== SOIL && below !== MUD && below !== HARD_SOIL) return;
 
   // Germinate
   const isDark   = hasOil;
@@ -303,24 +310,28 @@ function updatePlant(engine, x, y) {
     }
   }
 
-  if (Math.random() > 0.012) return; // growth tick
-
   if (engine.get(x, y-1) !== EMPTY) return; // blocked above
 
   const meta = engine.meta[i];
-  // 半径2セル以内の水を探索
-  let hasWater = false;
-  let hasSteam = false;
-  let hasMudW  = false;
-  for (let dy = -2; dy <= 2; dy++)
-    for (let dx = -2; dx <= 2; dx++) {
-      const np = engine.get(x+dx, y+dy);
-      if (np === WATER) hasWater = true;
-      if (np === STEAM) hasSteam = true;
-      if (np === MUD)   hasMudW  = true;
-    }
-  // STEAM/MUD counts as water (greenhouse / wetland effect)
-  if (!hasWater && !hasSteam && !hasMudW && Math.random() > 0.3) return;
+  const isLotusPlant = (meta & META_LOTUS) !== 0;
+
+  // 蓮(泥生まれ)は常に成長可能。通常植物は水/蒸気/土が必要
+  let hasSoilNear = false;
+  if (!isLotusPlant) {
+    let hasWater = false, hasSteam = false;
+    for (let dy = -2; dy <= 2; dy++)
+      for (let dx = -2; dx <= 2; dx++) {
+        const np = engine.get(x+dx, y+dy);
+        if (np === WATER) hasWater = true;
+        if (np === STEAM) hasSteam = true;
+        if (np === SOIL || np === HARD_SOIL) hasSoilNear = true;
+      }
+    if (!hasWater && !hasSteam && Math.random() > 0.3) return;
+  }
+
+  // 成長確率: 蓮 > 土の近く > 通常
+  const growthRate = isLotusPlant ? 0.030 : (hasSoilNear ? 0.022 : 0.012);
+  if (Math.random() > growthRate) return;
 
   // Estimate height by scanning downward
   let height = 0;
@@ -328,12 +339,15 @@ function updatePlant(engine, x, y) {
     if (engine.get(x, y+dy) === PLANT) height++; else break;
   }
 
-  const bloomChance = Math.min(0.06 + height * 0.045, 0.6);
+  // 土の近くや蓮はより大きく咲く
+  const bloomBase  = isLotusPlant ? 0.10 : (hasSoilNear ? 0.08 : 0.06);
+  const bloomStep  = isLotusPlant ? 0.060 : (hasSoilNear ? 0.052 : 0.045);
+  const bloomChance = Math.min(bloomBase + height * bloomStep, 0.75);
 
   if (Math.random() < bloomChance) {
     _bloom(engine, x, y-1, meta, false);
   } else {
-    const stemColor = (meta & META_LOTUS)
+    const stemColor = isLotusPlant
       ? LOTUS_STEM_COLS[Math.min(height, LOTUS_STEM_COLS.length-1)]
       : STEM_COLORS[Math.min(height, STEM_COLORS.length-1)];
     engine.plant(x, y-1, PLANT, stemColor, meta);
@@ -549,6 +563,7 @@ function updateAcid(engine, x, y) {
     if (n === COAL        && Math.random() > 0.93)  { engine.set(nx, ny, EMPTY); return; }
     if (n === GLASS       && Math.random() > 0.95)  { engine.set(nx, ny, EMPTY); return; }
     if (n === SOIL        && Math.random() > 0.95)  { engine.set(nx, ny, SAND);  return; }
+    if (n === HARD_SOIL   && Math.random() > 0.95)  { engine.set(nx, ny, SAND);  return; } // 固い土も溶ける
     if (n === ASH         && Math.random() > 0.93)  { engine.set(nx, ny, EMPTY); return; } // 灰も溶ける
     if (n === METAL       && Math.random() > 0.97)  { engine.set(nx, ny, RUST);  return; }
     if (n === RUST        && Math.random() > 0.90)  { engine.set(nx, ny, EMPTY); return; } // 錆除去
@@ -856,4 +871,5 @@ export const MATERIALS = {
   [ACID]:        { name: 'acid',        colors: [0x66FF33,0x44EE22,0x55DD44,0x88FF66,0x33CC11,0x77EE55],               update: updateAcid      },
   [MUD]:         { name: 'mud',         colors: [0x6B4226,0x5A3520,0x7B4A30,0x4A2D18,0x634030,0x523525],              update: updateMud       },
   [ICE]:         { name: 'ice',         colors: [0xAADDFF,0xBBEEFF,0x99CCEE,0xCCEEFF,0xB0DDFF,0x88CCEE],              update: updateIce       },
+  [HARD_SOIL]:   { name: 'hard_soil',   colors: [0x5C3D1E,0x4A2E12,0x6B4A28,0x523518,0x3E2810],                       update: null            },
 };
