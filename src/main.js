@@ -1,21 +1,28 @@
 import { Engine }       from './engine.js';
 import { Renderer }     from './renderer.js';
 import { InputHandler } from './input.js';
-import { EMPTY, SAND, WATER, WALL, SNOW, FIRE, OIL, LAVA, COAL } from './materials.js';
+import { EMPTY, SAND, WATER, WALL, SNOW, FIRE, OIL, LAVA, COAL,
+         SOIL, SEED, FUNGUS } from './materials.js';
 
 const CELL_SIZE = 4;
 
 // ─── Material palette ────────────────────────────────────────────────────────
 const PALETTE = [
-  { id: SAND,  label: '砂', color: '#C2A35A', key: '1' },
-  { id: WATER, label: '水', color: '#3A7BD5', key: '2' },
-  { id: SNOW,  label: '雪', color: '#EEEEFF', key: '3' },
-  { id: FIRE,  label: '火', color: '#FF6600', key: '4' },
-  { id: OIL,   label: '油', color: '#8B6914', key: '5' },
-  { id: LAVA,  label: '溶岩', color: '#FF4500', key: '6' },
-  { id: COAL,  label: '炭', color: '#333333', key: '7' },
-  { id: WALL,  label: '壁', color: '#888888', key: '8' },
-  { id: EMPTY, label: '消', color: '#555555', key: '0' },
+  // 燃焼系
+  { id: SAND,   label: '砂',   color: '#C2A35A', key: '1' },
+  { id: WATER,  label: '水',   color: '#3A7BD5', key: '2' },
+  { id: SNOW,   label: '雪',   color: '#EEEEFF', key: '3' },
+  { id: FIRE,   label: '火',   color: '#FF6600', key: '4' },
+  { id: OIL,    label: '油',   color: '#8B6914', key: '5' },
+  { id: LAVA,   label: '溶岩', color: '#FF4500', key: '6' },
+  { id: COAL,   label: '炭',   color: '#333333', key: '7' },
+  { id: WALL,   label: '壁',   color: '#888888', key: '8' },
+  // 生命系
+  { id: SOIL,   label: '土',   color: '#5C3D1E', key: 'q' },
+  { id: SEED,   label: '種',   color: '#A8C060', key: 'w' },
+  { id: FUNGUS, label: '菌',   color: '#4A2060', key: 'e' },
+  // ツール
+  { id: EMPTY,  label: '消',   color: '#555555', key: '0' },
 ];
 
 // ─── Rain spawner ────────────────────────────────────────────────────────────
@@ -78,6 +85,7 @@ function init() {
     engine.cells   = new Uint8Array(nw * nh);
     engine.colors  = new Uint32Array(nw * nh);
     engine.updated = new Uint8Array(nw * nh);
+    engine.meta    = new Uint8Array(nw * nh);
     renderer.imageData = renderer.ctx.createImageData(nw * CELL_SIZE, nh * CELL_SIZE);
     renderer.pixels    = new Uint32Array(renderer.imageData.data.buffer);
     renderer.pw        = nw * CELL_SIZE;
