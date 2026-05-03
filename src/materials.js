@@ -33,9 +33,15 @@ export const ICE         = 28;
 // bits 0-2: flower color index (0-7)
 // bit  3  : size flag (0=small, 1=large)
 // bit  4  : dark flag (0=normal, 1=dark)
+// bit  5  : lotus flag (MUD-grown plant)
 const META_COLOR = 0x07;
 const META_LARGE = 0x08;
 const META_DARK  = 0x10;
+const META_LOTUS = 0x20;
+
+const LOTUS_COLORS    = [0xFF99CC,0xFFCCFF,0xCC88FF,0xFFEEAA,0x88DDFF,0xAAFFDD,0xFF77AA,0xDDAAFF];
+const LOTUS_CENTER    = 0xFFFF44;
+const LOTUS_STEM_COLS = [0x1A4A2A,0x2A5A32,0x3A6A3A,0x1E3A26,0x224A2E];
 
 const FLOWER_COLORS  = [0xFF6688, 0xFFDD44, 0xFF88BB, 0xFFEEEE, 0xFF9944, 0x99EEAA, 0xCC88FF, 0x88CCFF];
 const DARK_F_COLORS  = [0xAA00BB, 0x990022, 0x440044, 0x001144, 0x220033, 0x004422, 0x550000, 0x330044];
@@ -234,7 +240,7 @@ function updateSeed(engine, x, y) {
   if (dA === EMPTY || dA === WATER) { engine.swap(x, y, x+dir, y+1); return; }
   if (dB === EMPTY || dB === WATER) { engine.swap(x, y, x-dir, y+1); return; }
 
-  if (Math.random() > 0.04) return; // germination check（緩和）
+  if (Math.random() > (below === MUD ? 0.08 : 0.04)) return; // MUD上は2倍速発芽
 
   // Dormant near ice
   {
@@ -255,25 +261,27 @@ function updateSeed(engine, x, y) {
   const onGround = [SOIL,SAND,STONE,WALL,GLASS,COAL,ASH].includes(below);
   if (!onGround) return;
 
-  // 半径3セル以内の水・油を探索（範囲拡大）
-  let hasWater = false, hasOil = false;
+  // 半径3セル以内の水・油・蒸気を探索
+  let hasWater = false, hasOil = false, hasSteamS = false;
   for (let dy = -3; dy <= 3; dy++) {
     for (let dx = -3; dx <= 3; dx++) {
       if (dx === 0 && dy === 0) continue;
       const n = engine.get(x+dx, y+dy);
       if (n === WATER || n === SOIL) hasWater = true;
       if (n === OIL)                 hasOil   = true;
+      if (n === STEAM)               hasSteamS = true;
     }
   }
-  // 土の上なら水なしでも発芽可能
-  if (!hasWater && below !== SOIL) return;
+  // 土/泥の上 or 水/蒸気があれば発芽可能
+  if (!hasWater && !hasSteamS && below !== SOIL && below !== MUD) return;
 
   // Germinate
   const isDark   = hasOil;
+  const isMudGrow = !isDark && (below === MUD); // 泥の上 → 蓮の花
   const colorIdx = Math.floor(Math.random() * 8);
   const isLarge  = Math.random() > 0.5 ? META_LARGE : 0;
-  const metaByte = colorIdx | isLarge | (isDark ? META_DARK : 0);
-  const stemCols = isDark ? DARK_STEM_COLS : STEM_COLORS;
+  const metaByte = colorIdx | isLarge | (isDark ? META_DARK : 0) | (isMudGrow ? META_LOTUS : 0);
+  const stemCols = isDark ? DARK_STEM_COLS : (isMudGrow ? LOTUS_STEM_COLS : STEM_COLORS);
 
   engine.plant(x, y, isDark ? DARK_PLANT : PLANT, stemCols[0], metaByte);
 }
@@ -303,14 +311,16 @@ function updatePlant(engine, x, y) {
   // 半径2セル以内の水を探索
   let hasWater = false;
   let hasSteam = false;
+  let hasMudW  = false;
   for (let dy = -2; dy <= 2; dy++)
     for (let dx = -2; dx <= 2; dx++) {
       const np = engine.get(x+dx, y+dy);
       if (np === WATER) hasWater = true;
       if (np === STEAM) hasSteam = true;
+      if (np === MUD)   hasMudW  = true;
     }
-  // STEAM counts as water (greenhouse effect)
-  if (!hasWater && !hasSteam && Math.random() > 0.3) return;
+  // STEAM/MUD counts as water (greenhouse / wetland effect)
+  if (!hasWater && !hasSteam && !hasMudW && Math.random() > 0.3) return;
 
   // Estimate height by scanning downward
   let height = 0;
@@ -323,7 +333,9 @@ function updatePlant(engine, x, y) {
   if (Math.random() < bloomChance) {
     _bloom(engine, x, y-1, meta, false);
   } else {
-    const stemColor = STEM_COLORS[Math.min(height, STEM_COLORS.length-1)];
+    const stemColor = (meta & META_LOTUS)
+      ? LOTUS_STEM_COLS[Math.min(height, LOTUS_STEM_COLS.length-1)]
+      : STEM_COLORS[Math.min(height, STEM_COLORS.length-1)];
     engine.plant(x, y-1, PLANT, stemColor, meta);
   }
 }
@@ -383,11 +395,13 @@ function updateDarkPlant(engine, x, y) {
 function _bloom(engine, x, y, meta, isDark) {
   const colorIdx    = meta & META_COLOR;
   const isLarge     = (meta & META_LARGE) !== 0;
-  const petalColor  = isDark ? DARK_F_COLORS[colorIdx] : FLOWER_COLORS[colorIdx];
-  const centerColor = isDark ? DARK_F_CENTER : FLOWER_CENTER;
+  const isLotus     = (meta & META_LOTUS) !== 0;
+  const petalColor  = isDark ? DARK_F_COLORS[colorIdx] : (isLotus ? LOTUS_COLORS[colorIdx] : FLOWER_COLORS[colorIdx]);
+  const centerColor = isDark ? DARK_F_CENTER : (isLotus ? LOTUS_CENTER : FLOWER_CENTER);
+  // 蓮の花は横に広く広がる
   const radius      = isLarge
-    ? 3 + Math.floor(Math.random() * 2)
-    : 1 + Math.floor(Math.random() * 2);
+    ? (isLotus ? 5 + Math.floor(Math.random() * 2) : 3 + Math.floor(Math.random() * 2))
+    : (isLotus ? 3 + Math.floor(Math.random() * 2) : 1 + Math.floor(Math.random() * 2));
   const flowerType  = isDark ? DARK_FLOWER : FLOWER;
 
   // Center (stamen)
@@ -417,6 +431,7 @@ function updateFungus(engine, x, y) {
   for (const [dx,dy] of nb4) {
     const n = engine.get(x+dx, y+dy);
     if (n === FIRE || n === LAVA)             { engine.set(x, y, EMPTY);      return; }
+    if (n === ICE  && Math.random() > 0.95)   { engine.set(x, y, EMPTY);      return; } // 凍死
     if (n === OIL  && Math.random() > 0.97)   { engine.set(x, y, GLOW_FUNGUS); return; }
   }
   if (Math.random() > 0.002) return;
@@ -436,9 +451,13 @@ function updateGlowFungus(engine, x, y) {
   for (const [dx,dy] of nb4) {
     const n = engine.get(x+dx, y+dy);
     if (n === FIRE || n === LAVA)          { engine.set(x, y, EMPTY); return; }
+    if (n === ICE  && Math.random() > 0.90)  { engine.set(x, y, EMPTY); return; } // 凍死
     if (n === OIL  && Math.random() > 0.8) { engine.set(x+dx, y+dy, EMPTY); } // consume oil
   }
-  if (Math.random() > 0.008) return;
+  // 蒸気が隣接していると超加速成長（高温多湿の洞窟）
+  let glowNearSteam = false;
+  for (const [dx2,dy2] of nb4) { if (engine.get(x+dx2, y+dy2) === STEAM) { glowNearSteam = true; break; } }
+  if (Math.random() > (glowNearSteam ? 0.002 : 0.008)) return;
 
   const spreadDirs = [[1,0],[-1,0],[0,1]];
   for (const [dx,dy] of spreadDirs) {
@@ -467,14 +486,13 @@ function updateRust(engine, x, y) {
 // ─── Liquid & Gas update functions ───────────────────────────────────────────
 
 function updateSteam(engine, x, y) {
-  const i = engine.idx(x, y);
-  // TTL: 80-119 frames then condenses
-  if (engine.meta[i] === 0) engine.meta[i] = 80 + Math.floor(Math.random() * 40);
+  // No TTL: steam accumulates at ceiling, then drips as water
 
   const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
   for (const [dx,dy] of nb4) {
     const nx = x+dx, ny = y+dy, n = engine.get(nx, ny);
-    if (n === SNOW || n === ICE) { engine.set(x, y, WATER); return; } // 凝結
+    if (n === SNOW || n === ICE) { engine.set(x, y, WATER); return; } // 冷えて凝結
+    if (n === ASH && Math.random() > 0.99) { engine.set(x, y, EMPTY); engine.set(nx, ny, SOIL); return; } // 灰+蒸気→土（生命サイクル循環）
     if (n === COAL && Math.random() > 0.97) {
       // 蒸気機関: 圧力爆発
       engine.set(x, y, SMOKE);
@@ -487,23 +505,37 @@ function updateSteam(engine, x, y) {
       }
       return;
     }
-    if (n === METAL && Math.random() > 0.995) { engine.set(nx, ny, RUST); } // 高温多湿で錆
+    if (n === METAL && Math.random() > 0.995) { engine.set(nx, ny, RUST); }
   }
 
-  // TTL countdown
-  engine.meta[i]--;
-  if (engine.meta[i] <= 0) { engine.set(x, y, WATER); return; }
+  // Rise slowly (25% per frame — slower than smoke)
+  if (Math.random() > 0.25) {
+    if (Math.random() > 0.997) { engine.set(x, y, EMPTY); } // 微量の蒸発（広い空間で消える）
+    return;
+  }
 
-  // Rise (slightly faster than smoke)
-  if (Math.random() > 0.42) return;
   const up = engine.get(x, y-1);
   if (up === EMPTY) { engine.swap(x, y, x, y-1); return; }
   const dir = Math.random() > 0.5 ? 1 : -1;
   if (engine.get(x+dir, y-1) === EMPTY) { engine.swap(x, y, x+dir, y-1); return; }
   if (engine.get(x-dir, y-1) === EMPTY) { engine.swap(x, y, x-dir, y-1); return; }
-  if (engine.get(x+dir, y)   === EMPTY) { engine.swap(x, y, x+dir, y);   return; }
-  if (engine.get(x-dir, y)   === EMPTY) { engine.swap(x, y, x-dir, y);   return; }
-  if (Math.random() > 0.97)             { engine.set(x, y, WATER); } // 詰まったら凝結
+  // 横に少し漂う
+  if (Math.random() > 0.35) return;
+  if (engine.get(x+dir, y) === EMPTY) { engine.swap(x, y, x+dir, y); return; }
+  if (engine.get(x-dir, y) === EMPTY) { engine.swap(x, y, x-dir, y); return; }
+
+  // 完全に詰まった（天井または壁に押し付けられた）→ 水滴を垂らす
+  const atCeiling = (y === 0 || up === WALL || up === STONE || up === GLASS || up === ICE);
+  if (atCeiling && Math.random() > 0.98) {
+    // 水滴が落ちる
+    if (engine.inBounds(x, y+1) && engine.get(x, y+1) === EMPTY) {
+      engine.set(x, y+1, WATER);
+    }
+    engine.set(x, y, EMPTY); // 蒸気は消えて水滴に変わった
+    return;
+  }
+  // 天井でない詰まり → ゆっくり消散
+  if (Math.random() > 0.993) { engine.set(x, y, EMPTY); }
 }
 
 function updateAcid(engine, x, y) {
@@ -517,6 +549,7 @@ function updateAcid(engine, x, y) {
     if (n === COAL        && Math.random() > 0.93)  { engine.set(nx, ny, EMPTY); return; }
     if (n === GLASS       && Math.random() > 0.95)  { engine.set(nx, ny, EMPTY); return; }
     if (n === SOIL        && Math.random() > 0.95)  { engine.set(nx, ny, SAND);  return; }
+    if (n === ASH         && Math.random() > 0.93)  { engine.set(nx, ny, EMPTY); return; } // 灰も溶ける
     if (n === METAL       && Math.random() > 0.97)  { engine.set(nx, ny, RUST);  return; }
     if (n === RUST        && Math.random() > 0.90)  { engine.set(nx, ny, EMPTY); return; } // 錆除去
     if (n === ICE         && Math.random() > 0.80)  { engine.set(nx, ny, WATER); return; }
@@ -637,10 +670,12 @@ function updateMetal(engine, x, y) {
       engine.set(x, y, LAVA); return;
     }
   }
-  // 水に長時間接触 → 錆
+  // 水/泥に長時間接触 → 錆（泥はより速い）
   if (Math.random() > 0.998) {
     for (const [dx,dy] of nb4) {
-      if (engine.get(x+dx, y+dy) === WATER) { engine.set(x, y, RUST); return; }
+      const wn = engine.get(x+dx, y+dy);
+      if (wn === WATER)              { engine.set(x, y, RUST); return; }
+      if (wn === MUD && Math.random() > 0.4) { engine.set(x, y, RUST); return; } // 泥は0.3%速
     }
   }
 }
@@ -816,7 +851,7 @@ export const MATERIALS = {
   [METAL]:       { name: 'metal',       colors: [0xB0B8C8,0x909AAA,0xC0C8D8,0xA0A8B8,0x8090A0,0xC8D0E0],              update: updateMetal     },
   [LIGHTNING]:   { name: 'lightning',   colors: [0xFFFFFF,0xEEEEFF,0xCCDDFF,0xAABBFF,0xDDEEFF,0xFFFFEE],              update: updateLightning },
   [SPARK]:       { name: 'spark',       colors: [0x88CCFF,0xAADDFF,0x66BBEE,0xCCEEFF,0x99DDFF,0x55AAEE],              update: updateSpark     },
-  [RUST]:        { name: 'rust',        colors: [0x8B4513,0xA0522D,0xCD853F,0x7B3A0A,0xB05A28],                       update: updateRust      },
+  [RUST]:        { name: 'rust',        colors: [0xB7410E,0xC0622A,0x9E2800,0xD4652B,0x8B3010,0xCC5218,0xA03818],                       update: updateRust      },
   [STEAM]:       { name: 'steam',       colors: [0xDDEEFF,0xCCDDF0,0xEEEEFF,0xC8D8E8,0xD8E8F8,0xE8F0FF],              update: updateSteam     },
   [ACID]:        { name: 'acid',        colors: [0x66FF33,0x44EE22,0x55DD44,0x88FF66,0x33CC11,0x77EE55],               update: updateAcid      },
   [MUD]:         { name: 'mud',         colors: [0x6B4226,0x5A3520,0x7B4A30,0x4A2D18,0x634030,0x523525],              update: updateMud       },
