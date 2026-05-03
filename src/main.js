@@ -1,7 +1,7 @@
 import { Engine }       from './engine.js';
 import { Renderer }     from './renderer.js';
 import { InputHandler } from './input.js';
-import { EMPTY, SAND, WATER, WALL, SNOW, FIRE } from './materials.js';
+import { EMPTY, SAND, WATER, WALL, SNOW, FIRE, OIL, LAVA, COAL } from './materials.js';
 
 const CELL_SIZE = 4;
 
@@ -11,8 +11,11 @@ const PALETTE = [
   { id: WATER, label: '水', color: '#3A7BD5', key: '2' },
   { id: SNOW,  label: '雪', color: '#EEEEFF', key: '3' },
   { id: FIRE,  label: '火', color: '#FF6600', key: '4' },
-  { id: WALL,  label: '壁', color: '#888888', key: '5' },
-  { id: EMPTY, label: '消', color: '#333333', key: '0' },
+  { id: OIL,   label: '油', color: '#8B6914', key: '5' },
+  { id: LAVA,  label: '溶岩', color: '#FF4500', key: '6' },
+  { id: COAL,  label: '炭', color: '#333333', key: '7' },
+  { id: WALL,  label: '壁', color: '#888888', key: '8' },
+  { id: EMPTY, label: '消', color: '#555555', key: '0' },
 ];
 
 // ─── Rain spawner ────────────────────────────────────────────────────────────
@@ -80,6 +83,16 @@ function init() {
     renderer.pw        = nw * CELL_SIZE;
   });
 
+  // ── Hint toast ────────────────────────────────────────────────────────────
+  const hint = document.getElementById('hint');
+  let hintTimer = null;
+  function showHint(msg) {
+    hint.textContent = msg;
+    hint.classList.add('show');
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => hint.classList.remove('show'), 1800);
+  }
+
   // ── UI: material buttons ──────────────────────────────────────────────────
   const toolbar = document.getElementById('toolbar');
   PALETTE.forEach(mat => {
@@ -124,16 +137,6 @@ function init() {
   document.getElementById('clear-btn').addEventListener('click', () => {
     engine.clear();
   });
-
-  // ── Hint toast ────────────────────────────────────────────────────────────
-  let hintTimer = null;
-  const hint = document.getElementById('hint');
-  function showHint(msg) {
-    hint.textContent = msg;
-    hint.classList.add('show');
-    clearTimeout(hintTimer);
-    hintTimer = setTimeout(() => hint.classList.remove('show'), 1800);
-  }
 
   // ── Game loop ─────────────────────────────────────────────────────────────
   function loop() {
