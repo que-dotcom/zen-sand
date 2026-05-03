@@ -2,7 +2,8 @@ import { Engine }       from './engine.js';
 import { Renderer }     from './renderer.js';
 import { InputHandler } from './input.js';
 import { EMPTY, SAND, WATER, WALL, SNOW, FIRE, OIL, LAVA, COAL,
-         SOIL, SEED, FUNGUS, METAL, LIGHTNING } from './materials.js';
+         SOIL, SEED, FUNGUS, METAL, LIGHTNING,
+         STEAM, ACID, MUD, ICE } from './materials.js';
 
 const CELL_SIZE = 4;
 
@@ -24,6 +25,11 @@ const PALETTE = [
   // 電気系
   { id: METAL,     label: '金属', color: '#B0B8C8', key: 'r' },
   { id: LIGHTNING, label: '雷',   color: '#EEEEFF', key: 't' },
+  // 液体・気体系
+  { id: STEAM, label: '蒸気', color: '#DDEEFF', key: 'y' },
+  { id: ACID,  label: '酸',   color: '#66FF33', key: 'u' },
+  { id: MUD,   label: '泥',   color: '#6B4226', key: 'i' },
+  { id: ICE,   label: '氷',   color: '#AADDFF', key: 'o' },
   // ツール
   { id: EMPTY,  label: '消',   color: '#555555', key: '0' },
 ];

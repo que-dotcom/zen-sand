@@ -24,6 +24,10 @@ export const METAL       = 21;
 export const LIGHTNING   = 22;
 export const SPARK       = 23;
 export const RUST        = 24;
+export const STEAM       = 25;
+export const ACID        = 26;
+export const MUD         = 27;
+export const ICE         = 28;
 
 // ─── Plant meta encoding (Uint8) ──────────────────────────────────────────────
 // bits 0-2: flower color index (0-7)
@@ -54,6 +58,14 @@ function updateSand(engine, x, y) {
     const nb = [engine.get(x,y+1), engine.get(x,y-1), engine.get(x+1,y), engine.get(x-1,y)];
     if (nb.includes(LAVA)) engine.set(x, y, GLASS);
   }
+  // Sand + Water/Mud → MUD (slow ooze)
+  if (Math.random() > 0.997) {
+    const nb4s = [[0,1],[1,0],[-1,0],[0,-1]];
+    for (const [dx,dy] of nb4s) {
+      const sn = engine.get(x+dx, y+dy);
+      if (sn === WATER || sn === MUD) { engine.set(x, y, MUD); return; }
+    }
+  }
 }
 
 function updateWater(engine, x, y) {
@@ -69,6 +81,14 @@ function updateWater(engine, x, y) {
     const check = [[0,1],[1,0],[-1,0]];
     for (const [dx,dy] of check) {
       if (engine.get(x+dx, y+dy) === SAND) { engine.set(x+dx, y+dy, SOIL); break; }
+    }
+  }
+  // Water + Snow/Ice → ICE (slow freeze)
+  if (Math.random() > 0.997) {
+    const nb4w = [[0,1],[1,0],[-1,0],[0,-1]];
+    for (const [dx,dy] of nb4w) {
+      const wn = engine.get(x+dx, y+dy);
+      if (wn === SNOW || wn === ICE) { engine.set(x, y, ICE); return; }
     }
   }
 }
@@ -101,7 +121,9 @@ function updateFire(engine, x, y) {
     if (n === FUNGUS     && Math.random() > 0.50) { engine.set(x+dx, y+dy, EMPTY); }
     if (n === GLOW_FUNGUS&& Math.random() > 0.50) { engine.set(x+dx, y+dy, EMPTY); }
     if (n === WATER && Math.random() > 0.55) {
-      engine.set(x, y, SMOKE); engine.updated[engine.idx(x,y)] = 1; return;
+      if (Math.random() > 0.5) { engine.set(x, y, STEAM); engine.meta[engine.idx(x,y)] = 0; }
+      else { engine.set(x, y, SMOKE); }
+      engine.updated[engine.idx(x,y)] = 1; return;
     }
   }
 
@@ -134,7 +156,8 @@ function updateLava(engine, x, y) {
   const nbDirs = [[0,1],[1,0],[-1,0],[0,-1]];
   for (const [dx,dy] of nbDirs) {
     const n = engine.get(x+dx, y+dy);
-    if (n === WATER) { engine.set(x, y, STONE); engine.set(x+dx, y+dy, SMOKE); return; }
+    if (n === WATER) { engine.set(x, y, STONE); engine.set(x+dx, y+dy, STEAM); engine.meta[engine.idx(x+dx,y+dy)] = 0; return; }
+    if (n === ICE)   { engine.set(x, y, STONE); engine.set(x+dx, y+dy, STEAM); engine.meta[engine.idx(x+dx,y+dy)] = 0; return; }
     if (n === SNOW)  { engine.set(x+dx, y+dy, WATER); }
     if (n === OIL  && Math.random() > 0.3)  { engine.set(x+dx, y+dy, FIRE); }
     if ((n === PLANT || n === DARK_PLANT || n === FLOWER || n === DARK_FLOWER) && Math.random() > 0.2) {
@@ -213,6 +236,14 @@ function updateSeed(engine, x, y) {
 
   if (Math.random() > 0.04) return; // germination check（緩和）
 
+  // Dormant near ice
+  {
+    const nb4seed = [[0,1],[1,0],[-1,0],[0,-1]];
+    for (const [dx,dy] of nb4seed) {
+      if (engine.get(x+dx, y+dy) === ICE) return;
+    }
+  }
+
   // Heat kills seed
   const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
   for (const [dx,dy] of nb4) {
@@ -271,10 +302,15 @@ function updatePlant(engine, x, y) {
   const meta = engine.meta[i];
   // 半径2セル以内の水を探索
   let hasWater = false;
-  for (let dy = -2; dy <= 2 && !hasWater; dy++)
-    for (let dx = -2; dx <= 2 && !hasWater; dx++)
-      if (engine.get(x+dx, y+dy) === WATER) hasWater = true;
-  if (!hasWater && Math.random() > 0.3) return;
+  let hasSteam = false;
+  for (let dy = -2; dy <= 2; dy++)
+    for (let dx = -2; dx <= 2; dx++) {
+      const np = engine.get(x+dx, y+dy);
+      if (np === WATER) hasWater = true;
+      if (np === STEAM) hasSteam = true;
+    }
+  // STEAM counts as water (greenhouse effect)
+  if (!hasWater && !hasSteam && Math.random() > 0.3) return;
 
   // Estimate height by scanning downward
   let height = 0;
@@ -427,6 +463,163 @@ function updateRust(engine, x, y) {
     if (n === LAVA)      { engine.set(x, y, LAVA); return; }
   }
 }
+
+// ─── Liquid & Gas update functions ───────────────────────────────────────────
+
+function updateSteam(engine, x, y) {
+  const i = engine.idx(x, y);
+  // TTL: 80-119 frames then condenses
+  if (engine.meta[i] === 0) engine.meta[i] = 80 + Math.floor(Math.random() * 40);
+
+  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
+  for (const [dx,dy] of nb4) {
+    const nx = x+dx, ny = y+dy, n = engine.get(nx, ny);
+    if (n === SNOW || n === ICE) { engine.set(x, y, WATER); return; } // 凝結
+    if (n === COAL && Math.random() > 0.97) {
+      // 蒸気機関: 圧力爆発
+      engine.set(x, y, SMOKE);
+      engine.set(nx, ny, FIRE);
+      for (const [ex,ey] of [[0,-1],[1,-1],[-1,-1],[1,0],[-1,0],[0,-2]]) {
+        const px=x+ex, py=y+ey;
+        if (engine.inBounds(px,py) && engine.get(px,py) === EMPTY) {
+          engine.set(px, py, Math.random() > 0.4 ? FIRE : SMOKE);
+        }
+      }
+      return;
+    }
+    if (n === METAL && Math.random() > 0.995) { engine.set(nx, ny, RUST); } // 高温多湿で錆
+  }
+
+  // TTL countdown
+  engine.meta[i]--;
+  if (engine.meta[i] <= 0) { engine.set(x, y, WATER); return; }
+
+  // Rise (slightly faster than smoke)
+  if (Math.random() > 0.42) return;
+  const up = engine.get(x, y-1);
+  if (up === EMPTY) { engine.swap(x, y, x, y-1); return; }
+  const dir = Math.random() > 0.5 ? 1 : -1;
+  if (engine.get(x+dir, y-1) === EMPTY) { engine.swap(x, y, x+dir, y-1); return; }
+  if (engine.get(x-dir, y-1) === EMPTY) { engine.swap(x, y, x-dir, y-1); return; }
+  if (engine.get(x+dir, y)   === EMPTY) { engine.swap(x, y, x+dir, y);   return; }
+  if (engine.get(x-dir, y)   === EMPTY) { engine.swap(x, y, x-dir, y);   return; }
+  if (Math.random() > 0.97)             { engine.set(x, y, WATER); } // 詰まったら凝結
+}
+
+function updateAcid(engine, x, y) {
+  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
+
+  for (const [dx,dy] of nb4) {
+    const nx = x+dx, ny = y+dy, n = engine.get(nx, ny);
+    if (n === WALL        && Math.random() > 0.98)  { engine.set(nx, ny, EMPTY); return; }
+    if (n === SAND        && Math.random() > 0.92)  { engine.set(nx, ny, EMPTY); return; }
+    if (n === STONE       && Math.random() > 0.97)  { engine.set(nx, ny, EMPTY); return; }
+    if (n === COAL        && Math.random() > 0.93)  { engine.set(nx, ny, EMPTY); return; }
+    if (n === GLASS       && Math.random() > 0.95)  { engine.set(nx, ny, EMPTY); return; }
+    if (n === SOIL        && Math.random() > 0.95)  { engine.set(nx, ny, SAND);  return; }
+    if (n === METAL       && Math.random() > 0.97)  { engine.set(nx, ny, RUST);  return; }
+    if (n === RUST        && Math.random() > 0.90)  { engine.set(nx, ny, EMPTY); return; } // 錆除去
+    if (n === ICE         && Math.random() > 0.80)  { engine.set(nx, ny, WATER); return; }
+    if (n === SNOW        && Math.random() > 0.85)  { engine.set(nx, ny, WATER); return; }
+    if (n === MUD         && Math.random() > 0.95)  { engine.set(nx, ny, WATER); engine.set(x, y, SAND); return; }
+    if ((n === PLANT || n === FLOWER || n === DARK_PLANT || n === DARK_FLOWER) && Math.random() > 0.90) {
+      engine.set(nx, ny, EMPTY); return;
+    }
+    if (n === SEED        && Math.random() > 0.90)  { engine.set(nx, ny, ASH);   return; }
+    if (n === FUNGUS      && Math.random() > 0.85)  { engine.set(nx, ny, EMPTY); return; }
+    if (n === GLOW_FUNGUS && Math.random() > 0.85)  {
+      // 最後の輝き: SPARK×3バースト
+      const si = engine.idx(nx, ny);
+      engine.cells[si] = SPARK; engine.colors[si] = 0x00FFDD; engine.updated[si] = 1;
+      for (const [bx,by] of [[0,-1],[1,0],[-1,0]]) {
+        const px=nx+bx, py=ny+by;
+        if (engine.inBounds(px,py) && engine.get(px,py) === EMPTY) { engine.set(px,py,SPARK); }
+      }
+      return;
+    }
+    if (n === WATER && Math.random() > 0.70)        { engine.set(x, y, WATER); return; } // 希釈
+    if (n === LAVA) {
+      // 激しい反応 → 蒸気バースト
+      engine.set(x, y, STEAM); engine.meta[engine.idx(x,y)] = 0;
+      engine.set(nx, ny, SMOKE);
+      for (const [ex,ey] of [[0,-1],[1,-1],[-1,-1]]) {
+        const px=x+ex, py=y+ey;
+        if (engine.inBounds(px,py) && engine.get(px,py) === EMPTY) { engine.set(px,py,STEAM); engine.meta[engine.idx(px,py)] = 0; }
+      }
+      return;
+    }
+    if (n === FIRE && Math.random() > 0.70) { engine.set(x, y, WATER); return; } // 中和
+  }
+
+  // Flow: denser than water — sinks through water
+  if (Math.random() > 0.65) return;
+  const below = engine.get(x, y+1);
+  if (below === EMPTY || below === WATER || below === STEAM) { engine.swap(x, y, x, y+1); return; }
+  const dir = Math.random() > 0.5 ? 1 : -1;
+  if ([EMPTY,WATER,STEAM].includes(engine.get(x+dir,y+1))) { engine.swap(x, y, x+dir, y+1); return; }
+  if ([EMPTY,WATER,STEAM].includes(engine.get(x-dir,y+1))) { engine.swap(x, y, x-dir, y+1); return; }
+  if (engine.get(x+dir, y) === EMPTY) { engine.swap(x, y, x+dir, y); return; }
+  if (engine.get(x-dir, y) === EMPTY) { engine.swap(x, y, x-dir, y); return; }
+}
+
+function updateMud(engine, x, y) {
+  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
+
+  for (const [dx,dy] of nb4) {
+    const n = engine.get(x+dx, y+dy);
+    if ((n === FIRE || n === LAVA) && Math.random() > 0.95) { engine.set(x, y, STONE); return; } // 焼成
+    if ((n === LIGHTNING || n === SPARK) && Math.random() > 0.6) { engine.set(x, y, SPARK); return; } // 導電
+    if (n === SNOW && Math.random() > 0.98) { engine.set(x+dx, y+dy, MUD); } // 雪→泥
+  }
+
+  // Viscous flow
+  if (Math.random() > 0.5) return;
+  const below = engine.get(x, y+1);
+  if (below === EMPTY || below === WATER || below === STEAM) { engine.swap(x, y, x, y+1); return; }
+  const dir = Math.random() > 0.5 ? 1 : -1;
+  if ([EMPTY,WATER,STEAM].includes(engine.get(x+dir,y+1))) { engine.swap(x, y, x+dir, y+1); return; }
+  if ([EMPTY,WATER,STEAM].includes(engine.get(x-dir,y+1))) { engine.swap(x, y, x-dir, y+1); return; }
+  if (Math.random() > 0.25) return;
+  if (engine.get(x+dir, y) === EMPTY) { engine.swap(x, y, x+dir, y); return; }
+  if (engine.get(x-dir, y) === EMPTY) { engine.swap(x, y, x-dir, y); return; }
+}
+
+function updateIce(engine, x, y) {
+  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
+  for (const [dx,dy] of nb4) {
+    const n = engine.get(x+dx, y+dy);
+    if (n === FIRE  && Math.random() > 0.90) { engine.set(x, y, WATER); return; }
+    if (n === LAVA  && Math.random() > 0.60) {
+      engine.set(x, y, WATER);
+      if (engine.inBounds(x, y-1) && engine.get(x, y-1) === EMPTY) { engine.set(x, y-1, STEAM); engine.meta[engine.idx(x, y-1)] = 0; }
+      return;
+    }
+    if ((n === LIGHTNING || n === SPARK) && Math.random() > 0.70) {
+      engine.set(x, y, WATER);
+      for (const [sdx,sdy] of [[0,-1],[1,0],[-1,0]]) {
+        const px=x+sdx, py=y+sdy;
+        if (engine.inBounds(px,py) && engine.get(px,py) === EMPTY) { engine.set(px,py,SPARK); }
+      }
+      return;
+    }
+    if (n === ACID  && Math.random() > 0.80) { engine.set(x, y, WATER); return; }
+    if (n === STEAM && Math.random() > 0.97) { engine.set(x+dx, y+dy, WATER); } // 蒸気凝結
+  }
+  // Slow freeze: spread to adjacent water when cold nearby
+  if (Math.random() > 0.003) return;
+  for (const [dx,dy] of nb4) {
+    if (engine.get(x+dx, y+dy) === WATER) {
+      let cold = false;
+      for (let ey=-3; ey<=3 && !cold; ey++)
+        for (let ex=-3; ex<=3 && !cold; ex++) {
+          const cn = engine.get(x+ex, y+ey);
+          if (cn === SNOW || cn === ICE) cold = true;
+        }
+      if (cold) { engine.set(x+dx, y+dy, ICE); engine.updated[engine.idx(x+dx,y+dy)] = 1; return; }
+    }
+  }
+}
+
 // ─── Electricity update functions ────────────────────────────────────────────
 
 function updateMetal(engine, x, y) {
@@ -481,6 +674,18 @@ function _lightningReact(engine, x, y) {
     else if (n === SNOW)                              { engine.set(nx, ny, WATER); }
     else if (n === SOIL)                              { engine.set(nx, ny, SAND);  }
     else if (n === RUST)                              { engine.set(nx, ny, SAND);  } // 錆が砂に崩壊
+    else if (n === ICE) {
+      engine.set(nx, ny, WATER);
+      for (const [sdx,sdy] of [[0,-1],[1,0],[-1,0]]) {
+        const px=nx+sdx, py=ny+sdy;
+        if (engine.inBounds(px,py) && engine.get(px,py) === EMPTY) { engine.set(px,py,SPARK); }
+      }
+    }
+    else if (n === MUD) {
+      const mi = engine.idx(nx, ny);
+      engine.cells[mi] = SPARK; engine.colors[mi] = MATERIALS[SPARK].colors[0]; engine.updated[mi] = 1;
+    }
+    else if (n === STEAM) { engine.set(nx, ny, WATER); }
     else if (n === PLANT || n === FLOWER || n === DARK_FLOWER) { engine.set(nx, ny, FIRE); }
     else if (n === DARK_PLANT) {
       // F+: 激しく発火 + 8方向に飛び火
@@ -612,4 +817,8 @@ export const MATERIALS = {
   [LIGHTNING]:   { name: 'lightning',   colors: [0xFFFFFF,0xEEEEFF,0xCCDDFF,0xAABBFF,0xDDEEFF,0xFFFFEE],              update: updateLightning },
   [SPARK]:       { name: 'spark',       colors: [0x88CCFF,0xAADDFF,0x66BBEE,0xCCEEFF,0x99DDFF,0x55AAEE],              update: updateSpark     },
   [RUST]:        { name: 'rust',        colors: [0x8B4513,0xA0522D,0xCD853F,0x7B3A0A,0xB05A28],                       update: updateRust      },
+  [STEAM]:       { name: 'steam',       colors: [0xDDEEFF,0xCCDDF0,0xEEEEFF,0xC8D8E8,0xD8E8F8,0xE8F0FF],              update: updateSteam     },
+  [ACID]:        { name: 'acid',        colors: [0x66FF33,0x44EE22,0x55DD44,0x88FF66,0x33CC11,0x77EE55],               update: updateAcid      },
+  [MUD]:         { name: 'mud',         colors: [0x6B4226,0x5A3520,0x7B4A30,0x4A2D18,0x634030,0x523525],              update: updateMud       },
+  [ICE]:         { name: 'ice',         colors: [0xAADDFF,0xBBEEFF,0x99CCEE,0xCCEEFF,0xB0DDFF,0x88CCEE],              update: updateIce       },
 };
