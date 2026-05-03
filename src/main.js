@@ -2,7 +2,7 @@ import { Engine }       from './engine.js';
 import { Renderer }     from './renderer.js';
 import { InputHandler } from './input.js';
 import { EMPTY, SAND, WATER, WALL, SNOW, FIRE, OIL, LAVA, COAL,
-         SOIL, SEED, FUNGUS } from './materials.js';
+         SOIL, SEED, FUNGUS, METAL, LIGHTNING } from './materials.js';
 
 const CELL_SIZE = 4;
 
@@ -21,6 +21,9 @@ const PALETTE = [
   { id: SOIL,   label: '土',   color: '#5C3D1E', key: 'q' },
   { id: SEED,   label: '種',   color: '#A8C060', key: 'w' },
   { id: FUNGUS, label: '菌',   color: '#4A2060', key: 'e' },
+  // 電気系
+  { id: METAL,     label: '金属', color: '#B0B8C8', key: 'r' },
+  { id: LIGHTNING, label: '雷',   color: '#EEEEFF', key: 't' },
   // ツール
   { id: EMPTY,  label: '消',   color: '#555555', key: '0' },
 ];

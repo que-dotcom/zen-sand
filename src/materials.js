@@ -20,6 +20,9 @@ export const FUNGUS      = 17;
 export const GLOW_FUNGUS = 18;
 export const FLOWER      = 19;
 export const DARK_FLOWER = 20;
+export const METAL       = 21;
+export const LIGHTNING   = 22;
+export const SPARK       = 23;
 
 // ─── Plant meta encoding (Uint8) ──────────────────────────────────────────────
 // bits 0-2: flower color index (0-7)
@@ -412,6 +415,88 @@ function updateGlowFungus(engine, x, y) {
   }
 }
 
+// ─── Electricity update functions ────────────────────────────────────────────
+
+function updateMetal(engine, x, y) {
+  // Falls like sand but slightly more stable (less diagonal sliding)
+  const below = engine.get(x, y+1);
+  if (below === EMPTY || below === WATER) { engine.swap(x, y, x, y+1); return; }
+  const dir = Math.random() > 0.5 ? 1 : -1;
+  const dA = engine.get(x+dir, y+1), dB = engine.get(x-dir, y+1);
+  if ((dA === EMPTY || dA === WATER) && Math.random() > 0.35) { engine.swap(x, y, x+dir, y+1); return; }
+  if ((dB === EMPTY || dB === WATER) && Math.random() > 0.35) { engine.swap(x, y, x-dir, y+1); return; }
+  // Lava melts metal → becomes lava
+  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
+  for (const [dx,dy] of nb4) {
+    if (engine.get(x+dx, y+dy) === LAVA && Math.random() > 0.94) {
+      engine.set(x, y, LAVA); return;
+    }
+  }
+}
+
+function updateLightning(engine, x, y) {
+  const i = engine.idx(x, y);
+
+  // Initialize TTL on first frame (meta=0 means fresh)
+  if (engine.meta[i] === 0) engine.meta[i] = 3 + Math.floor(Math.random() * 3);
+
+  // React with every adjacent cell
+  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
+  for (const [dx,dy] of nb4) {
+    const nx = x+dx, ny = y+dy;
+    const n  = engine.get(nx, ny);
+    const ni = engine.idx(nx, ny);
+
+    if (n === METAL) {
+      // Instant chain through metal — do NOT mark updated so it propagates this frame
+      if (engine.meta[ni] === 0) { // only if not already electrified
+        engine.cells[ni]  = LIGHTNING;
+        engine.colors[ni] = MATERIALS[LIGHTNING].colors[Math.floor(Math.random() * MATERIALS[LIGHTNING].colors.length)];
+        engine.meta[ni]   = engine.meta[i]; // inherit TTL
+      }
+    } else if (n === WATER) {
+      // Spark spreads through water over several frames
+      engine.cells[ni]    = SPARK;
+      engine.colors[ni]   = MATERIALS[SPARK].colors[Math.floor(Math.random() * MATERIALS[SPARK].colors.length)];
+      engine.updated[ni]  = 1; // prevent same-frame chain (visual wave effect)
+    } else if (n === SAND   && Math.random() > 0.25) { engine.set(nx, ny, GLASS); }
+    else if (n === OIL)                               { engine.set(nx, ny, FIRE);  }
+    else if (n === COAL)                              { engine.set(nx, ny, FIRE);  }
+    else if (n === SNOW)                              { engine.set(nx, ny, WATER); }
+    else if (n === SOIL)                              { engine.set(nx, ny, SAND);  }  // dry out
+    else if (n === PLANT  || n === DARK_PLANT ||
+             n === FLOWER || n === DARK_FLOWER)       { engine.set(nx, ny, FIRE);  }
+    else if (n === FUNGUS || n === GLOW_FUNGUS)       { engine.set(nx, ny, GLOW_FUNGUS); }
+    else if (n === SEED)                              { engine.set(nx, ny, ASH);   }
+  }
+
+  // Count down TTL
+  engine.meta[i]--;
+  if (engine.meta[i] <= 0) {
+    engine.cells[i]  = EMPTY;
+    engine.colors[i] = 0;
+    engine.meta[i]   = 0;
+  }
+}
+
+function updateSpark(engine, x, y) {
+  // Fade back to water quickly
+  if (Math.random() > 0.82) { engine.set(x, y, WATER); return; }
+
+  // Spread electric wave through adjacent water (one generation per frame)
+  if (Math.random() > 0.6) return;
+  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
+  for (const [dx,dy] of nb4) {
+    const nx = x+dx, ny = y+dy;
+    if (engine.get(nx, ny) === WATER) {
+      const ni = engine.idx(nx, ny);
+      engine.cells[ni]   = SPARK;
+      engine.colors[ni]  = MATERIALS[SPARK].colors[Math.floor(Math.random() * MATERIALS[SPARK].colors.length)];
+      engine.updated[ni] = 1; // one step per frame = visible wave front
+    }
+  }
+}
+
 // ─── Material definitions ──────────────────────────────────────────────────────
 export const MATERIALS = {
   [EMPTY]:       { name: 'empty',       colors: [],                                                                    update: null            },
@@ -435,4 +520,7 @@ export const MATERIALS = {
   [GLOW_FUNGUS]: { name: 'glow_fungus', colors: [0x00FFCC,0x00DDAA,0x00FFAA,0x33FFDD,0x00EEC0],                       update: updateGlowFungus},
   [FLOWER]:      { name: 'flower',      colors: [...FLOWER_COLORS, FLOWER_CENTER],                                     update: null            },
   [DARK_FLOWER]: { name: 'dark_flower', colors: [...DARK_F_COLORS, DARK_F_CENTER],                                     update: null            },
+  [METAL]:       { name: 'metal',       colors: [0xB0B8C8,0x909AAA,0xC0C8D8,0xA0A8B8,0x8090A0,0xC8D0E0],              update: updateMetal     },
+  [LIGHTNING]:   { name: 'lightning',   colors: [0xFFFFFF,0xEEEEFF,0xCCDDFF,0xAABBFF,0xDDEEFF,0xFFFFEE],              update: updateLightning },
+  [SPARK]:       { name: 'spark',       colors: [0x88CCFF,0xAADDFF,0x66BBEE,0xCCEEFF,0x99DDFF,0x55AAEE],              update: updateSpark     },
 };
