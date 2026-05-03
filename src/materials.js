@@ -259,7 +259,7 @@ function updateSeed(engine, x, y) {
   }
 
   // Must rest on solid ground
-  const onGround = [SOIL,SAND,STONE,WALL,GLASS,COAL,ASH,HARD_SOIL].includes(below);
+  const onGround = [SOIL,SAND,STONE,WALL,GLASS,COAL,ASH,HARD_SOIL,MUD].includes(below);
   if (!onGround) return;
 
   // 半径3セル以内の水・油を探索
@@ -871,5 +871,5 @@ export const MATERIALS = {
   [ACID]:        { name: 'acid',        colors: [0x66FF33,0x44EE22,0x55DD44,0x88FF66,0x33CC11,0x77EE55],               update: updateAcid      },
   [MUD]:         { name: 'mud',         colors: [0x6B4226,0x5A3520,0x7B4A30,0x4A2D18,0x634030,0x523525],              update: updateMud       },
   [ICE]:         { name: 'ice',         colors: [0xAADDFF,0xBBEEFF,0x99CCEE,0xCCEEFF,0xB0DDFF,0x88CCEE],              update: updateIce       },
-  [HARD_SOIL]:   { name: 'hard_soil',   colors: [0x5C3D1E,0x4A2E12,0x6B4A28,0x523518,0x3E2810],                       update: null            },
+  [HARD_SOIL]:   { name: 'hard_soil',   colors: [0xC47A45,0xB86838,0xD48855,0xA85C30,0xCC7A40],                       update: null            },
 };

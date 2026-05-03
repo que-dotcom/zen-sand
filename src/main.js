@@ -20,7 +20,7 @@ const PALETTE = [
   { id: WALL,   label: '壁',   color: '#888888', key: '8' },
   // 生命系
   { id: SOIL,      label: '土(落)', color: '#5C3D1E', key: 'q' },
-  { id: HARD_SOIL, label: '土(固)', color: '#6B4A28', key: 'a' },
+  { id: HARD_SOIL, label: '土(固)', color: '#C47A45', key: 'a' },
   { id: SEED,   label: '種',   color: '#A8C060', key: 'w' },
   { id: FUNGUS, label: '菌',   color: '#4A2060', key: 'e' },
   // 電気系
