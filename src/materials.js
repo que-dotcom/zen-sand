@@ -41,6 +41,9 @@ export const SAKURA_SEED  = 36; // 桜の種（発芽→桜の木）
 export const SAKURA_TREE  = 37; // 桜の木（成長・開花・散花の3フェーズ）
 export const SAKURA_PETAL = 38; // 花びら（ヒラヒラと舞い落ちる）
 export const FIREFLY      = 39; // 蛍（植物+水から自然発生・明滅）
+export const POLLEN       = 40; // 花粉（逆重力型・遺伝子を運ぶ大気搬送粒子）
+export const MA_VOID      = 41; // 間（封じられた聖域・空白の力）
+export const KOI          = 42; // 鯉（水中を泳ぐ自律エージェント）
 
 // ─── Plant meta encoding (Uint8) ──────────────────────────────────────────────
 // bits 0-2: flower color index (0-7)
@@ -82,6 +85,34 @@ const YUKIZAKURA_PETAL_COLS = [0xFFF0F8, 0xF8F0FF, 0xF0EEFF, 0xFFF8FF, 0xE8F0FF,
 const SAKURA_SEED_COLS   = [0xC0784E, 0xAA6040, 0xD08858, 0xB87050, 0xC87848];
 // 蛍（動的に書き換えるのでデフォルト色のみ）
 const FIREFLY_COLS = [0xFFFF44, 0xFFEE22, 0xFFFF66, 0xFFF020, 0xFFEE44];
+// 花粉
+const POLLEN_COLS  = [0xFFEE44, 0xFFDD22, 0xFFEE66, 0xFFCC00, 0xFFEE88, 0xFFDD55];
+// 間（MA_VOID）: 背景(0x0A0A0A)とわずかに異なる幽玄な暗色
+const MA_VOID_COLS = [0x08080C, 0x090910, 0x07070A, 0x0A0A0E, 0x080A0D];
+// 鯉（KOI）: 錦鯉カラー（白・赤・黒・橙のバリエーション）
+const KOI_COLS = [0xFFFFFF, 0xEEEEEE, 0xEE3322, 0xDD2211, 0x111111, 0x222222, 0xFF6600];
+// 鯉の移動方向テーブル（8方向、インデックス 0-7）
+//   0:[上] 1:[右上] 2:[右] 3:[右下] 4:[下] 5:[左下] 6:[左] 7:[左上]
+const KOI_DIRS = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
+// 鯉の尾びれ（KOI_TAIL）: パレット非表示・内部専用素材
+// meta = TTL カウンタ（1 フレームデクリメント、0 → WATER に戻る）
+const KOI_TAIL = 43;
+
+// ─── POLLEN meta エンコーディング ────────────────────────────────────────────
+// bits 0-2 (0x07): 遺伝子カラーインデックス（0-7、FLOWER_COLORS のインデックスに対応）
+//                  META_COLOR(0x07) と同じビット位置 → FLOWER の meta から直接継承可能
+// bit  3   (0x08): 暗変異フラグ（DARK_FLOWER 由来なら 1）
+// bit  4   (0x10): ドリフト方向（0=左、1=右）
+// bits 5-7 (0xE0): 寿命カウンタ（0-7、0.8%/frame でデクリメント、0で消滅）
+//
+// 注意: SAKURA_PETAL の META_PETAL_FROZEN(0x80) は POLLEN には無関係（別素材）
+//       FLOWER/PLANT の META_COLOR(0x07) と bit レイアウトが揃っているのは意図的
+// ─────────────────────────────────────────────────────────────────────────────
+const POLLEN_GENE       = 0x07; // bits 0-2: 遺伝子インデックス
+const POLLEN_DARK       = 0x08; // bit  3:   暗変異フラグ
+const POLLEN_DRIFT      = 0x10; // bit  4:   ドリフト方向（0=左、1=右）
+const POLLEN_LIFE       = 0xE0; // bits 5-7: 寿命
+const POLLEN_LIFE_SHIFT = 5;    // bits 5-7 へのシフト量
 
 // ─── フェーズ1 SOIL / MUD meta 値の割り当て ────────────────────────────────────
 // 純粋な数値（ビット演算なし）。素材ごとに独立した意味を持つ。
@@ -1469,6 +1500,10 @@ function updateSakuraTree(engine, x, y) {
 
   } else if (phase < 192) {
     // ──── Phase 2: 開花期 ────────────────────────────────────────────────
+    // 花粉放出（0.005%/frame）: 桜遺伝子（インデックス0=ピンク赤）を持つ花粉を真上に
+    if (Math.random() < 0.00005) {
+      _emitPollen(engine, x, y, 0, false); // gene=0 (FLOWER_COLORS[0]=0xFF6688 桜ピンク)
+    }
     if (Math.random() > 0.018) return; // 1.8%/frame で花びらを放出
 
     // 周囲の空きセルに SAKURA_PETAL を生成
@@ -1676,6 +1711,318 @@ function updateFirefly(engine, x, y) {
   }
 }
 
+// ─── Pollen update functions ──────────────────────────────────────────────────
+
+// 花粉放出ヘルパー（FLOWER/DARK_FLOWER/SAKURA_TREE Phase2 の共通ロジック）
+// geneIdx: 遺伝子インデックス（0-7）  isDark: DARK_FLOWER 由来かどうか
+function _emitPollen(engine, x, y, geneIdx, isDark) {
+  if (!engine.inBounds(x, y-1) || engine.get(x, y-1) !== EMPTY) return;
+  const driftDir   = Math.random() > 0.5 ? POLLEN_DRIFT : 0;
+  const pollenMeta = (geneIdx & POLLEN_GENE)
+    | (isDark ? POLLEN_DARK : 0)
+    | driftDir
+    | (7 << POLLEN_LIFE_SHIFT); // 寿命 = 7（最大値）
+  const pi = engine.idx(x, y-1);
+  engine.cells[pi]   = POLLEN;
+  engine.colors[pi]  = POLLEN_COLS[Math.floor(Math.random() * POLLEN_COLS.length)];
+  engine.meta[pi]    = pollenMeta;
+  engine.updated[pi] = 1;
+}
+
+// FLOWER: 静的だが花粉を放出する（update: null → updateFlower に変更）
+function updateFlower(engine, x, y) {
+  if (Math.random() < 0.00005) { // 0.005%/frame
+    const pm = engine.meta[engine.idx(x, y)];
+    _emitPollen(engine, x, y, pm & POLLEN_GENE, (pm & META_DARK) !== 0);
+  }
+}
+
+// DARK_FLOWER: 同上（isDark = true）
+function updateDarkFlower(engine, x, y) {
+  if (Math.random() < 0.00005) {
+    const pm = engine.meta[engine.idx(x, y)];
+    _emitPollen(engine, x, y, pm & POLLEN_GENE, true);
+  }
+}
+
+// ─── POLLEN 物理挙動 ──────────────────────────────────────────────────────────
+// ・逆重力: 30% で上昇、35% で横ドリフト（meta の方向ビットで左右固定）、35% で静止
+// ・寿命: 0.8%/frame でデクリメント。0 になったら EMPTY へ
+// ・FLOWER: 受粉（遺伝子色上書き）、PLANT: 0.5% で早期開花、
+//   WATER: 黄みがかった色に染色、ICE: 氷封静止（寿命停止）、SAKURA_PETAL: 相殺
+// ─────────────────────────────────────────────────────────────────────────────
+function updatePollen(engine, x, y) {
+  const i    = engine.idx(x, y);
+  const meta = engine.meta[i];
+
+  // パレット直置き（meta=0）の場合は寿命を初期化して次フレームから動く
+  if (meta === 0) {
+    const driftDir = Math.random() > 0.5 ? POLLEN_DRIFT : 0;
+    engine.meta[i] = driftDir | (7 << POLLEN_LIFE_SHIFT);
+    return;
+  }
+
+  const geneIdx = meta & POLLEN_GENE;                         // bits 0-2: 遺伝子
+  const driftR  = (meta & POLLEN_DRIFT) !== 0;                // bit 4: true=右
+  const life    = (meta & POLLEN_LIFE) >> POLLEN_LIFE_SHIFT;  // bits 5-7: 寿命
+
+  // ──── 隣接セルとの反応 ────────────────────────────────────────────────────
+  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
+  let iceAdjacent = false;
+  for (const [dx,dy] of nb4) {
+    const nx = x+dx, ny = y+dy;
+    const n  = engine.get(nx, ny);
+    const ni = engine.idx(nx, ny);
+
+    if (n === FIRE || n === LAVA) { engine.set(x, y, EMPTY); return; }
+
+    if (n === ICE) { iceAdjacent = true; continue; } // 氷封フラグを立てるだけ
+
+    if (n === SAKURA_PETAL) {
+      // 花びらと花粉が交差 → 互いに消滅（儚い出会い）
+      engine.set(x, y, EMPTY);
+      engine.set(nx, ny, EMPTY);
+      return;
+    }
+
+    if (n === FLOWER) {
+      // 受粉（60% の確率）: FLOWER の遺伝子色を花粉の遺伝子で上書き
+      if (Math.random() < 0.60) {
+        const flowerMeta = engine.meta[ni];
+        engine.meta[ni]   = (flowerMeta & ~POLLEN_GENE) | geneIdx;
+        // 視覚的にも即座に遺伝子色へ変化
+        const isDark  = (flowerMeta & META_DARK)  !== 0;
+        const isLotus = (flowerMeta & META_LOTUS) !== 0;
+        engine.colors[ni] = isDark  ? DARK_F_COLORS[geneIdx]
+                          : isLotus ? LOTUS_COLORS[geneIdx]
+                          :           FLOWER_COLORS[geneIdx];
+        engine.set(x, y, EMPTY);
+        return;
+      }
+    }
+
+    if (n === PLANT && Math.random() < 0.005) {
+      // 早期開花（0.5%）: PLANT → FLOWER（遺伝子色で咲く）
+      engine.cells[ni]   = FLOWER;
+      engine.colors[ni]  = FLOWER_COLORS[geneIdx];
+      engine.meta[ni]    = geneIdx;
+      engine.updated[ni] = 1;
+      engine.set(x, y, EMPTY);
+      return;
+    }
+
+    if (n === WATER) {
+      // 花粉水: 水の色を黄みがかった色に染める（花粉自身は消えない）
+      engine.colors[ni] = 0xD4B83A;
+    }
+  }
+
+  // ──── 氷封の花粉: ICE 隣接中は静止・寿命停止 ──────────────────────────────
+  if (iceAdjacent) {
+    engine.colors[i] = 0xFFEE88; // 薄い黄白色（氷に閉じ込められた花粉）
+    return;
+  }
+
+  // ──── 寿命デクリメント（0.8%/frame）─────────────────────────────────────────
+  if (Math.random() < 0.008) {
+    if (life === 0) { engine.set(x, y, EMPTY); return; }
+    engine.meta[i] = (meta & ~POLLEN_LIFE) | ((life - 1) << POLLEN_LIFE_SHIFT);
+  }
+
+  // ──── 浮遊移動（逆重力型）────────────────────────────────────────────────────
+  const r       = Math.random();
+  const driftDx = driftR ? 1 : -1;
+
+  if (r < 0.30) {
+    // 上昇（30%）
+    if (engine.inBounds(x, y-1) && engine.get(x, y-1) === EMPTY) {
+      engine.swap(x, y, x, y-1); return;
+    }
+  } else if (r < 0.65) {
+    // 横ドリフト（35%）: meta に記録された方向へ。塞がれたら反転
+    if (engine.inBounds(x+driftDx, y) && engine.get(x+driftDx, y) === EMPTY) {
+      engine.swap(x, y, x+driftDx, y); return;
+    }
+    if (engine.inBounds(x-driftDx, y) && engine.get(x-driftDx, y) === EMPTY) {
+      engine.meta[i] ^= POLLEN_DRIFT; // ドリフト方向を反転して記憶
+      engine.swap(x, y, x-driftDx, y); return;
+    }
+  }
+  // 残り 35%: その場に漂う（何もしない）
+}
+
+// ─── KOI update functions ────────────────────────────────────────────────────
+
+// KOI_TAIL: 鯉が通過した跡に 1 フレームだけ残る残像（尾びれ表現）
+// meta = TTL（1 で生成 → 0 になったら WATER に戻る）
+function updateKoiTail(engine, x, y) {
+  const i   = engine.idx(x, y);
+  const ttl = engine.meta[i];
+  if (ttl <= 0) {
+    engine.set(x, y, WATER); // 寿命が尽きたら水に戻る
+    return;
+  }
+  engine.meta[i] = ttl - 1;
+}
+
+// ─── KOI meta エンコーディング ────────────────────────────────────────────────
+// bits 0-2 (0x07): 移動方向インデックス（0-7、KOI_DIRS に対応）
+// bits 3-7       : 予約（将来のジャンプ・産卵フェーズ用）
+//
+// 動作: 15%/frame で行動（ゆっくり泳ぐ）
+// 移動: 向いている方向の隣接セルが WATER なら swap で泳ぐ
+//       障害物なら向きをランダムに変えて待機
+// 死亡: 隣接 4 方向に ACID / LAVA があれば EMPTY に消滅
+// ─────────────────────────────────────────────────────────────────────────────
+function updateKoi(engine, x, y) {
+  // 鯉はゆっくり動く（15%/frame で行動）
+  if (Math.random() > 0.15) return;
+
+  const i    = engine.idx(x, y);
+  const meta = engine.meta[i];
+  const dir  = meta & 0x07; // bits 0-2 = 移動方向インデックス
+
+  // ──── 死亡判定（4方向に ACID/LAVA があれば消滅）────────────────────────────
+  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
+  for (const [dx, dy] of nb4) {
+    const n = engine.get(x+dx, y+dy);
+    if (n === ACID || n === LAVA) {
+      engine.set(x, y, EMPTY);
+      return;
+    }
+  }
+
+  // ──── 移動ロジック ────────────────────────────────────────────────────────
+  const [dx, dy] = KOI_DIRS[dir];
+  const nx = x+dx, ny = y+dy;
+
+  if (engine.inBounds(nx, ny)) {
+    const target = engine.get(nx, ny);
+    // 水、または他の鯉の尾びれの中を泳げる
+    if (target === WATER || target === KOI_TAIL) {
+      const koiColor = engine.colors[i]; // 現在の鯉の色を保存
+
+      engine.swap(x, y, nx, ny);
+
+      // 移動後、元いた場所 (x, y) を尾びれにする
+      const tailIdx = engine.idx(x, y);
+      engine.cells[tailIdx]   = KOI_TAIL;
+      engine.colors[tailIdx]  = koiColor; // 頭と同じ色にして連続感を出す
+      engine.meta[tailIdx]    = 1;        // TTL=1: 2フレームで水に戻る
+      engine.updated[tailIdx] = 1;        // 同フレーム内の二重処理を防止
+
+      // 5% の確率でランダムに向きを変える（自然な揺らぎ）
+      if (Math.random() < 0.05) {
+        engine.meta[engine.idx(nx, ny)] = (meta & ~0x07) | Math.floor(Math.random() * 8);
+      }
+      return;
+    }
+  }
+
+  // 障害物 or 水以外 → 向きをランダムに変えて待機（次フレームで再試行）
+  engine.meta[i] = (meta & ~0x07) | Math.floor(Math.random() * 8);
+}
+
+// ─── Ma Void update function ─────────────────────────────────────────────────
+
+// ─── MA_VOID 動作仕様 ─────────────────────────────────────────────────────────
+// ★ 静的素材: 重力なし。落下せず、その場に留まる。
+//
+// 【崩壊条件】8方向確認:
+//   EMPTY（MA_VOID ではない真の空間）/ LAVA / ACID が隣接 → 自身が EMPTY に消滅
+//   → 密閉された空間（石・壁で囲まれた場所）でのみ存在できる
+//
+// 【聖域内の干渉】4方向確認（1フレームに1反応・戻り値で終了）:
+//   FIRE       → 即消去（穢れの浄化）
+//   ASH        → 5%  で EMPTY（無に還る）
+//   DARK_PLANT → 1%  で PLANT（闇が光に）。META_DARK / META_ICE_CRYSTAL を解除
+//   SEED       → 10% で SAKURA_TREE Phase2（白い桜として直接開花）
+//   SAKURA_PETAL → swap（浮遊演出: 花びらが落ちずに漂う）
+//
+// パフォーマンス: 20%/frame のみ処理（Math.random() > 0.2 でスキップ）
+// ─────────────────────────────────────────────────────────────────────────────
+function updateMaVoid(engine, x, y) {
+  // 処理頻度を 10% に絞る（パフォーマンス確保 + 全体的な動作速度の抑制）
+  if (Math.random() > 0.1) return;
+
+  // ──── 聖域崩壊チェック（8方向）─────────────────────────────────────────────
+  // ・LAVA / ACID → 即死（侵食）
+  // ・EMPTY       → isExposed フラグを立てるのみ（ループ内では確率ロールしない）
+  //
+  // ループの「外」で 1 回だけ風化ロールを行うことで多重判定を防止する。
+  // 実効崩壊確率: 10% × 2% = 0.2%/frame → 平均寿命 ~8〜10 秒 (@ 60fps)
+  // → プレイヤーが箱の内部を塗りつぶすのに十分な猶予が生まれる
+  let isExposed = false;
+  const nb8 = [[0,1],[1,0],[-1,0],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
+  for (const [dx, dy] of nb8) {
+    const nx = x+dx, ny = y+dy;
+    if (!engine.inBounds(nx, ny)) continue;
+    const n = engine.get(nx, ny);
+    if (n === LAVA || n === ACID) {
+      engine.set(x, y, EMPTY); return; // 汚染による即死
+    }
+    if (n === EMPTY) {
+      isExposed = true; // 外気に触れているフラグ（ここでは消さない）
+    }
+  }
+
+  // ループを抜けた後で 1 回だけ風化判定（多重ロール完全防止）
+  // 10% × 1% = 0.1%/frame → 平均寿命 ~16.6秒（@ 60fps）
+  if (isExposed && Math.random() < 0.01) {
+    engine.set(x, y, EMPTY); return; // ゆっくりとした風化消滅
+  }
+
+  // ──── 聖域内の干渉（4方向のみ）──────────────────────────────────────────────
+  // 1反応/フレーム: return で打ち切り
+  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
+  for (const [dx,dy] of nb4) {
+    const nx = x+dx, ny = y+dy;
+    const n  = engine.get(nx, ny);
+    const ni = engine.idx(nx, ny);
+
+    // 穢れの浄化: FIRE を即消去
+    if (n === FIRE) {
+      engine.set(nx, ny, EMPTY);
+      return;
+    }
+
+    // 無への還元: ASH を 5% で消滅
+    if (n === ASH && Math.random() < 0.05) {
+      engine.set(nx, ny, EMPTY);
+      return;
+    }
+
+    // 闇の浄化: DARK_PLANT → PLANT（1%）
+    // META_DARK(0x10) と META_ICE_CRYSTAL(0x40) を解除し、明るい茎色に変換
+    if (n === DARK_PLANT && Math.random() < 0.01) {
+      engine.cells[ni]   = PLANT;
+      engine.colors[ni]  = STEM_COLORS[Math.floor(Math.random() * STEM_COLORS.length)];
+      engine.meta[ni]    = engine.meta[ni] & ~(META_DARK | META_ICE_CRYSTAL);
+      engine.updated[ni] = 1;
+      return;
+    }
+
+    // 聖域の発芽: SEED → 白い桜の木（Phase 2 = 即開花）（10%）
+    // 土も水もなくとも聖域の力で直接開花フェーズから始まる
+    if (n === SEED && Math.random() < 0.10) {
+      engine.cells[ni]   = SAKURA_TREE;
+      engine.colors[ni]  = 0xFFFFFF; // 白い桜（幽玄な聖域の木）
+      engine.meta[ni]    = 64;        // Phase 2 直入り（開花）
+      engine.updated[ni] = 1;
+      return;
+    }
+
+    // 花びらの浮遊: MA_VOID の「真下」にある花びらのみ上へ押し上げる
+    // dy=1  → neighbor は (x, y+1) = MA_VOID より下 = 花びらが下にある → swap で花びらが上昇 ✓
+    // dy=-1 → neighbor は (x, y-1) = MA_VOID より上 = 花びらが上にある → swap すると下降してしまう ✗（除外）
+    // dx=±1 → 横方向は中立（横移動のみ、浮遊ドリフトに使用）
+    if (n === SAKURA_PETAL && (dy === 1 || dx !== 0)) {
+      engine.swap(x, y, nx, ny);
+      return;
+    }
+  }
+}
+
 // ─── Material definitions ──────────────────────────────────────────────────────
 export const MATERIALS = {
   [EMPTY]:       { name: 'empty',       colors: [],                                                                    update: null            },
@@ -1697,8 +2044,8 @@ export const MATERIALS = {
   [DARK_PLANT]:  { name: 'dark_plant',  colors: [0x1A081A,0x220A22,0x2A0A2A,0x300A30,0x1E081E],                       update: updateDarkPlant },
   [FUNGUS]:      { name: 'fungus',      colors: [0x4A2060,0x3A1050,0x5A3070,0x441858,0x3C1060],                       update: updateFungus    },
   [GLOW_FUNGUS]: { name: 'glow_fungus', colors: [0x00FFCC,0x00DDAA,0x00FFAA,0x33FFDD,0x00EEC0],                       update: updateGlowFungus},
-  [FLOWER]:      { name: 'flower',      colors: [...FLOWER_COLORS, FLOWER_CENTER],                                     update: null            },
-  [DARK_FLOWER]: { name: 'dark_flower', colors: [...DARK_F_COLORS, DARK_F_CENTER],                                     update: null            },
+  [FLOWER]:      { name: 'flower',      colors: [...FLOWER_COLORS, FLOWER_CENTER],                                     update: updateFlower     },
+  [DARK_FLOWER]: { name: 'dark_flower', colors: [...DARK_F_COLORS, DARK_F_CENTER],                                     update: updateDarkFlower },
   [METAL]:       { name: 'metal',       colors: [0xB0B8C8,0x909AAA,0xC0C8D8,0xA0A8B8,0x8090A0,0xC8D0E0],              update: updateMetal     },
   [LIGHTNING]:   { name: 'lightning',   colors: [0xFFFFFF,0xEEEEFF,0xCCDDFF,0xAABBFF,0xDDEEFF,0xFFFFEE],              update: updateLightning },
   [SPARK]:       { name: 'spark',       colors: [0x88CCFF,0xAADDFF,0x66BBEE,0xCCEEFF,0x99DDFF,0x55AAEE],              update: updateSpark     },
@@ -1719,4 +2066,8 @@ export const MATERIALS = {
   [SAKURA_TREE]:  { name: 'sakura_tree',  colors: [...SAKURA_TRUNK_COLS, ...SAKURA_BRANCH_COLS],                         update: updateSakuraTree  },
   [SAKURA_PETAL]: { name: 'sakura_petal', colors: [...SAKURA_PETAL_COLS],                                                update: updateSakuraPetal },
   [FIREFLY]:      { name: 'firefly',      colors: [...FIREFLY_COLS],                                                     update: updateFirefly     },
+  [POLLEN]:       { name: 'pollen',       colors: [...POLLEN_COLS],                                                      update: updatePollen      },
+  [MA_VOID]:      { name: 'ma_void',      colors: [...MA_VOID_COLS],                                                     update: updateMaVoid      },
+  [KOI]:          { name: 'koi',          colors: [...KOI_COLS],                                                         update: updateKoi         },
+  [KOI_TAIL]:     { name: 'koi_tail',    colors: [...KOI_COLS],                                                         update: updateKoiTail     },
 };

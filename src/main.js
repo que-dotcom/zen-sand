@@ -5,7 +5,7 @@ import { EMPTY, SAND, WATER, WALL, SNOW, FIRE, OIL, LAVA, COAL,
          SOIL, SEED, FUNGUS, METAL, LIGHTNING,
          STEAM, ACID, MUD, ICE, HARD_SOIL,
          ACID_PLANT, OBSIDIAN, SANDSTONE, BASALT, SPRING, LAVA_SPRING,
-         SAKURA_SEED, SAKURA_PETAL, FIREFLY } from './materials.js';
+         SAKURA_SEED, SAKURA_PETAL, FIREFLY, POLLEN, MA_VOID, KOI } from './materials.js';
 import { SCENARIOS, MATERIAL_TRIGGER_MAP } from './scenarios.js';
 
 const CELL_SIZE = 4;
@@ -45,6 +45,9 @@ const PALETTE = [
   { id: SAKURA_SEED,  label: '桜種',  color: '#C0784E', key: 'j' },
   { id: SAKURA_PETAL, label: '花びら', color: '#FFB7C5', key: 'k' },
   { id: FIREFLY,      label: '蛍',    color: '#FFFF44', key: 'l' },
+  { id: POLLEN,       label: '花粉',  color: '#FFEE44', key: 'z' },
+  { id: MA_VOID,      label: '間',    color: '#08080C', key: 'x' },
+  { id: KOI,          label: '鯉',    color: '#E04020', key: 'c' },
   // ツール
   { id: EMPTY,  label: '消',   color: '#555555', key: '0' },
 ];
