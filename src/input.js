@@ -1,13 +1,16 @@
 export class InputHandler {
   constructor(canvas, engine, cellSize) {
-    this.canvas      = canvas;
-    this.engine      = engine;
-    this.cellSize    = cellSize;
-    this.isDrawing   = false;
-    this.material    = 1; // default: SAND
-    this.brushRadius = 3;
+    this.canvas        = canvas;
+    this.engine        = engine;
+    this.cellSize      = cellSize;
+    this.isDrawing     = false;
+    this.material      = 1; // default: SAND
+    this.brushRadius   = 3;
+    this.usedMaterials = new Set(); // シナリオ進行トラッキング用
     this._bindEvents();
   }
+
+  resetUsage() { this.usedMaterials.clear(); }
 
   _gridPos(clientX, clientY) {
     const rect  = this.canvas.getBoundingClientRect();
@@ -21,6 +24,7 @@ export class InputHandler {
 
   paint(clientX, clientY) {
     const { x, y } = this._gridPos(clientX, clientY);
+    this.usedMaterials.add(this.material);
     const r = this.brushRadius;
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {

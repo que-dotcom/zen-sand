@@ -3,7 +3,9 @@ import { Renderer }     from './renderer.js';
 import { InputHandler } from './input.js';
 import { EMPTY, SAND, WATER, WALL, SNOW, FIRE, OIL, LAVA, COAL,
          SOIL, SEED, FUNGUS, METAL, LIGHTNING,
-         STEAM, ACID, MUD, ICE, HARD_SOIL } from './materials.js';
+         STEAM, ACID, MUD, ICE, HARD_SOIL,
+         ACID_PLANT, OBSIDIAN, SANDSTONE, BASALT, SPRING, LAVA_SPRING } from './materials.js';
+import { SCENARIOS, MATERIAL_TRIGGER_MAP } from './scenarios.js';
 
 const CELL_SIZE = 4;
 
@@ -27,10 +29,17 @@ const PALETTE = [
   { id: METAL,     label: '金属', color: '#B0B8C8', key: 'r' },
   { id: LIGHTNING, label: '雷',   color: '#EEEEFF', key: 't' },
   // 液体・気体系
-  { id: STEAM, label: '蒸気', color: '#DDEEFF', key: 'y' },
-  { id: ACID,  label: '酸',   color: '#66FF33', key: 'u' },
-  { id: MUD,   label: '泥',   color: '#6B4226', key: 'i' },
-  { id: ICE,   label: '氷',   color: '#AADDFF', key: 'o' },
+  { id: STEAM,  label: '蒸気', color: '#DDEEFF', key: 'y' },
+  { id: ACID,   label: '酸',   color: '#66FF33', key: 'u' },
+  { id: MUD,    label: '泥',   color: '#6B4226', key: 'i' },
+  { id: ICE,    label: '氷',   color: '#AADDFF', key: 'o' },
+  // P3 素材
+  { id: ACID_PLANT, label: '酸植物', color: '#5A9900', key: 'p' },
+  { id: OBSIDIAN,   label: '黒曜石', color: '#1A1A2E', key: 's' },
+  { id: SANDSTONE,  label: '砂岩',   color: '#C4A35A', key: 'd' },
+  { id: BASALT,     label: '玄武岩', color: '#2A1A1A', key: 'f' },
+  { id: SPRING,      label: '水源',   color: '#1A88DD', key: 'g' },
+  { id: LAVA_SPRING, label: '溶岩源', color: '#FF3300', key: 'h' },
   // ツール
   { id: EMPTY,  label: '消',   color: '#555555', key: '0' },
 ];
@@ -42,7 +51,7 @@ class Spawner {
     this.input   = input;
     this.enabled = false;
     this.tick    = 0;
-    this.rate    = 4; // every N frames
+    this.rate    = 4;
   }
 
   update() {
@@ -72,7 +81,6 @@ class Spawner {
 function init() {
   const canvas = document.getElementById('canvas');
 
-  // Fit canvas to window
   function resize() {
     const w = Math.floor(window.innerWidth  / CELL_SIZE);
     const h = Math.floor(window.innerHeight / CELL_SIZE);
@@ -87,7 +95,6 @@ function init() {
   const input    = new InputHandler(canvas, engine, CELL_SIZE);
   const spawner  = new Spawner(engine, input);
 
-  // Handle window resize (rebuild engine — clears canvas)
   window.addEventListener('resize', () => {
     const { w: nw, h: nh } = resize();
     engine.width  = nw;
@@ -99,6 +106,7 @@ function init() {
     renderer.imageData = renderer.ctx.createImageData(nw * CELL_SIZE, nh * CELL_SIZE);
     renderer.pixels    = new Uint32Array(renderer.imageData.data.buffer);
     renderer.pw        = nw * CELL_SIZE;
+    if (activeScenario) loadScenario(activeScenario);
   });
 
   // ── Hint toast ────────────────────────────────────────────────────────────
@@ -110,6 +118,96 @@ function init() {
     clearTimeout(hintTimer);
     hintTimer = setTimeout(() => hint.classList.remove('show'), 1800);
   }
+
+  // ── Scenario system ───────────────────────────────────────────────────────
+  let activeScenario = null;
+  let currentAct     = 0;
+
+  const scenarioBar   = document.getElementById('scenario-bar');
+  const scenarioModal = document.getElementById('scenario-modal');
+
+  function updateScenarioBar() {
+    if (!activeScenario) {
+      scenarioBar.classList.remove('show');
+      return;
+    }
+    const acts = activeScenario.acts;
+    const actHint = currentAct < acts.length
+      ? acts[currentAct].hint
+      : acts[acts.length - 1].hint;
+    scenarioBar.textContent = actHint;
+    scenarioBar.classList.add('show');
+  }
+
+  function loadScenario(scenario) {
+    activeScenario = scenario;
+    currentAct     = 0;
+    input.resetUsage();
+    scenario.load(engine);
+    updateScenarioBar();
+    closeModal();
+    showHint(`シナリオ: ${scenario.title}`);
+  }
+
+  function checkActProgress() {
+    if (!activeScenario) return;
+    const acts = activeScenario.acts;
+    if (currentAct >= acts.length - 1) return;
+
+    const nextAct = acts[currentAct + 1];
+    if (!nextAct.trigger) return;
+
+    // 素材使用ベースのトリガー
+    const usedTrigger = [...input.usedMaterials].some(
+      id => MATERIAL_TRIGGER_MAP[id] === nextAct.trigger
+    );
+
+    // エンジンイベントベースのトリガー（plant_spawned など）
+    const eventTrigger = engine.firedEvents.has(nextAct.trigger);
+
+    if (usedTrigger || eventTrigger) {
+      currentAct++;
+      input.resetUsage();
+      updateScenarioBar();
+    }
+  }
+
+  // ── Scenario modal ────────────────────────────────────────────────────────
+  function openModal() {
+    scenarioModal.classList.add('show');
+  }
+
+  function closeModal() {
+    scenarioModal.classList.remove('show');
+  }
+
+  // Build scenario cards
+  const scenarioList = document.getElementById('scenario-list');
+  SCENARIOS.forEach(scenario => {
+    const card = document.createElement('div');
+    card.className = 'scenario-card';
+    card.innerHTML = `
+      <div class="scenario-card-left">
+        <span class="scenario-emoji">${scenario.emoji}</span>
+        <div>
+          <div class="scenario-title">${scenario.title}</div>
+          <div class="scenario-subtitle">${scenario.subtitle}</div>
+          <div class="scenario-difficulty">${scenario.difficulty}</div>
+        </div>
+      </div>
+      <button class="scenario-play-btn">プレイ</button>
+    `;
+    card.querySelector('.scenario-play-btn').addEventListener('click', () => {
+      loadScenario(scenario);
+    });
+    scenarioList.appendChild(card);
+  });
+
+  document.getElementById('scenario-btn').addEventListener('click', openModal);
+  document.getElementById('scenario-modal-close').addEventListener('click', closeModal);
+  scenarioModal.addEventListener('click', e => {
+    if (e.target === scenarioModal) closeModal();
+  });
 
   // ── UI: material buttons ──────────────────────────────────────────────────
   const toolbar = document.getElementById('toolbar');
@@ -131,8 +229,8 @@ function init() {
   }
   selectMaterial(SAND);
 
-  // Keyboard shortcuts
   document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
     const mat = PALETTE.find(p => p.key === e.key);
     if (mat) selectMaterial(mat.id);
   });
@@ -154,6 +252,8 @@ function init() {
   // ── UI: clear ────────────────────────────────────────────────────────────
   document.getElementById('clear-btn').addEventListener('click', () => {
     engine.clear();
+    activeScenario = null;
+    updateScenarioBar();
   });
 
   // ── Game loop ─────────────────────────────────────────────────────────────
@@ -161,6 +261,7 @@ function init() {
     spawner.update();
     engine.update();
     renderer.render();
+    checkActProgress();
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);

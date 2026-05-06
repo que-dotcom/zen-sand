@@ -2,13 +2,16 @@ import { MATERIALS, EMPTY } from './materials.js';
 
 export class Engine {
   constructor(width, height) {
-    this.width   = width;
-    this.height  = height;
-    this.cells   = new Uint8Array(width * height);
-    this.colors  = new Uint32Array(width * height);
-    this.updated = new Uint8Array(width * height);
-    this.meta    = new Uint8Array(width * height); // flower color/size lineage
+    this.width       = width;
+    this.height      = height;
+    this.cells       = new Uint8Array(width * height);
+    this.colors      = new Uint32Array(width * height);
+    this.updated     = new Uint8Array(width * height);
+    this.meta        = new Uint8Array(width * height); // flower color/size lineage
+    this.firedEvents = new Set(); // scenario event bus (cleared each frame)
   }
+
+  fireEvent(name) { this.firedEvents.add(name); }
 
   idx(x, y) { return y * this.width + x; }
   inBounds(x, y) { return x >= 0 && x < this.width && y >= 0 && y < this.height; }
@@ -50,6 +53,7 @@ export class Engine {
   }
 
   update() {
+    this.firedEvents.clear();
     this.updated.fill(0);
     for (let y = this.height - 1; y >= 0; y--) {
       const ltr = (y & 1) === 0;

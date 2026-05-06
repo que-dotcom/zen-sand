@@ -8,16 +8,36 @@
 </head>
 <body>
   <canvas id="canvas"></canvas>
+
+  <!-- Material hint toast (auto-dismiss) -->
   <div id="hint"></div>
+
+  <!-- Scenario act hint bar (persistent) -->
+  <div id="scenario-bar"></div>
+
+  <!-- Main UI bar -->
   <div id="ui">
     <div id="toolbar"></div>
     <div id="brush-controls">
       <span class="ui-label">ブラシ</span>
       <input type="range" id="brush-size" min="1" max="8" value="3">
     </div>
+    <button id="scenario-btn" class="icon-btn" title="シナリオ">🎬</button>
     <button id="rain-btn" class="icon-btn" title="雨モード（トグル）">☁</button>
     <button id="clear-btn">クリア</button>
   </div>
+
+  <!-- Scenario modal -->
+  <div id="scenario-modal">
+    <div id="scenario-modal-box">
+      <div id="scenario-modal-header">
+        <span id="scenario-modal-title">シナリオを選ぶ</span>
+        <button id="scenario-modal-close">✕</button>
+      </div>
+      <div id="scenario-list"></div>
+    </div>
+  </div>
+
   <script type="module" src="src/main.js"></script>
 </body>
 </html>
