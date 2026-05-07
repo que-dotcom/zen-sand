@@ -94,9 +94,10 @@ const KOI_COLS = [0xFFFFFF, 0xEEEEEE, 0xEE3322, 0xDD2211, 0x111111, 0x222222, 0x
 // 鯉の移動方向テーブル（8方向、インデックス 0-7）
 //   0:[上] 1:[右上] 2:[右] 3:[右下] 4:[下] 5:[左下] 6:[左] 7:[左上]
 const KOI_DIRS = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
-// 鯉の尾びれ（KOI_TAIL）: パレット非表示・内部専用素材
-// meta = TTL カウンタ（1 フレームデクリメント、0 → WATER に戻る）
-const KOI_TAIL = 43;
+// 鯉のボディ（KOI_BODY）: パレット非表示・内部専用素材
+// KOI（頭）が移動するたびに周囲の WATER を KOI_BODY で塗り直す
+// → 3x3 の視覚的集合体として「錦鯉ブロック」を表現する
+const KOI_BODY = 43;
 
 // ─── POLLEN meta エンコーディング ────────────────────────────────────────────
 // bits 0-2 (0x07): 遺伝子カラーインデックス（0-7、FLOWER_COLORS のインデックスに対応）
@@ -1853,34 +1854,28 @@ function updatePollen(engine, x, y) {
 
 // ─── KOI update functions ────────────────────────────────────────────────────
 
-// KOI_TAIL: 鯉が通過した跡に 1 フレームだけ残る残像（尾びれ表現）
-// meta = TTL（1 で生成 → 0 になったら WATER に戻る）
-function updateKoiTail(engine, x, y) {
-  const i   = engine.idx(x, y);
-  const ttl = engine.meta[i];
-  if (ttl <= 0) {
-    engine.set(x, y, WATER); // 寿命が尽きたら水に戻る
-    return;
-  }
-  engine.meta[i] = ttl - 1;
-}
+// KOI_BODY: 鯉の胴体ボディセル（updateKoi が頭移動のたびに管理する）
+// 自律的には動かない（static）。頭が動くときに一括クリア→再生成される。
+function updateKoiBody(engine, x, y) { return; }
 
 // ─── KOI meta エンコーディング ────────────────────────────────────────────────
 // bits 0-2 (0x07): 移動方向インデックス（0-7、KOI_DIRS に対応）
-// bits 3-7       : 予約（将来のジャンプ・産卵フェーズ用）
+// bits 3-7       : 予約
 //
-// 動作: 15%/frame で行動（ゆっくり泳ぐ）
-// 移動: 向いている方向の隣接セルが WATER なら swap で泳ぐ
-//       障害物なら向きをランダムに変えて待機
-// 死亡: 隣接 4 方向に ACID / LAVA があれば EMPTY に消滅
+// 視覚的集合体の構成（頭を中心とした 3×3 ブロック）:
+//   [BODY][KOI ][BODY]   ← y
+//   [BODY][BODY][BODY]   ← y+1
+//   [BODY][BODY][BODY]   ← y+2
+//
+// 頭が移動するたびに「旧ボディをクリア → 新ボディを生成」する
+// 物理的な swap は頭セル 1 個のみ。ボディは WATER との色の上書きにすぎない。
 // ─────────────────────────────────────────────────────────────────────────────
 function updateKoi(engine, x, y) {
-  // 鯉はゆっくり動く（15%/frame で行動）
   if (Math.random() > 0.15) return;
 
   const i    = engine.idx(x, y);
   const meta = engine.meta[i];
-  const dir  = meta & 0x07; // bits 0-2 = 移動方向インデックス
+  const dir  = meta & 0x07;
 
   // ──── 死亡判定（4方向に ACID/LAVA があれば消滅）────────────────────────────
   const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
@@ -1898,18 +1893,37 @@ function updateKoi(engine, x, y) {
 
   if (engine.inBounds(nx, ny)) {
     const target = engine.get(nx, ny);
-    // 水、または他の鯉の尾びれの中を泳げる
-    if (target === WATER || target === KOI_TAIL) {
-      const koiColor = engine.colors[i]; // 現在の鯉の色を保存
+    // 水、または自分のボディの中を泳げる
+    if (target === WATER || target === KOI_BODY) {
+      const koiColor = engine.colors[i];
 
+      // ★ 移動前: 旧ボディをすべて水に戻す（x±1, y〜y+2）
+      for (let bx = -1; bx <= 1; bx++) {
+        for (let by = 0; by <= 2; by++) {
+          if (bx === 0 && by === 0) continue; // 頭は消さない
+          const cx = x+bx, cy = y+by;
+          if (engine.inBounds(cx, cy) && engine.get(cx, cy) === KOI_BODY) {
+            engine.set(cx, cy, WATER);
+          }
+        }
+      }
+
+      // ★ 頭を移動（物理的な swap はこの 1 回のみ）
       engine.swap(x, y, nx, ny);
 
-      // 移動後、元いた場所 (x, y) を尾びれにする
-      const tailIdx = engine.idx(x, y);
-      engine.cells[tailIdx]   = KOI_TAIL;
-      engine.colors[tailIdx]  = koiColor; // 頭と同じ色にして連続感を出す
-      engine.meta[tailIdx]    = 1;        // TTL=1: 2フレームで水に戻る
-      engine.updated[tailIdx] = 1;        // 同フレーム内の二重処理を防止
+      // ★ 移動後: 新しい頭を中心に 3×3 のボディを生成（WATER セルのみ上書き）
+      for (let bx = -1; bx <= 1; bx++) {
+        for (let by = 0; by <= 2; by++) {
+          if (bx === 0 && by === 0) continue; // 頭は上書きしない
+          const cx = nx+bx, cy = ny+by;
+          if (engine.inBounds(cx, cy) && engine.get(cx, cy) === WATER) {
+            const bi = engine.idx(cx, cy);
+            engine.cells[bi]   = KOI_BODY;
+            engine.colors[bi]  = koiColor; // 頭と同じ錦鯉色
+            engine.updated[bi] = 1;
+          }
+        }
+      }
 
       // 5% の確率でランダムに向きを変える（自然な揺らぎ）
       if (Math.random() < 0.05) {
@@ -2069,5 +2083,5 @@ export const MATERIALS = {
   [POLLEN]:       { name: 'pollen',       colors: [...POLLEN_COLS],                                                      update: updatePollen      },
   [MA_VOID]:      { name: 'ma_void',      colors: [...MA_VOID_COLS],                                                     update: updateMaVoid      },
   [KOI]:          { name: 'koi',          colors: [...KOI_COLS],                                                         update: updateKoi         },
-  [KOI_TAIL]:     { name: 'koi_tail',    colors: [...KOI_COLS],                                                         update: updateKoiTail     },
+  [KOI_BODY]:     { name: 'koi_body',    colors: [...KOI_COLS],                                                         update: updateKoiBody     },
 };
