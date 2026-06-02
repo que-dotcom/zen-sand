@@ -20,30 +20,64 @@ body {
 
 #ui {
   position: fixed;
-  bottom: 24px;
+  bottom: 18px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 10px;
+  max-width: min(1100px, calc(100vw - 24px));
   background: rgba(10, 10, 10, 0.75);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 50px;
-  padding: 8px 18px;
-  white-space: nowrap;
+  padding: 8px 14px;
 }
 
 #toolbar {
   display: flex;
+  align-items: center;
   gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  scroll-padding-inline: 16px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+  /* Fade both edges to hint horizontal scrollability */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+}
+
+#toolbar::-webkit-scrollbar {
+  height: 4px;
+}
+
+#toolbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+#toolbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
 }
 
 .mat-btn {
   display: flex;
   align-items: center;
   gap: 5px;
+  flex: 0 0 auto;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 20px;
@@ -77,7 +111,8 @@ body {
 .divider {
   width: 1px;
   height: 20px;
-  background: rgba(255, 255, 255, 0.1);
+  margin: 0 3px;
+  background: rgba(255, 255, 255, 0.12);
   flex-shrink: 0;
 }
 
@@ -139,6 +174,8 @@ body {
   top: 20px;
   left: 50%;
   transform: translateX(-50%);
+  max-width: calc(100vw - 24px);
+  text-align: center;
   background: rgba(10, 10, 10, 0.7);
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 20px;
@@ -161,6 +198,8 @@ body {
   top: 56px;
   left: 50%;
   transform: translateX(-50%);
+  max-width: calc(100vw - 24px);
+  text-align: center;
   background: rgba(10, 10, 30, 0.82);
   border: 1px solid rgba(100, 160, 255, 0.25);
   border-radius: 20px;
@@ -171,7 +210,6 @@ body {
   opacity: 0;
   transition: opacity 0.5s ease;
   z-index: 10;
-  white-space: nowrap;
 }
 
 #scenario-bar.show {
@@ -308,4 +346,74 @@ body {
   background: rgba(80, 140, 255, 0.28);
   border-color: rgba(80, 140, 255, 0.55);
   color: rgba(180, 210, 255, 1);
+}
+
+/* ─── Responsive: tablet / mobile ─────────────────────────────────────────── */
+@media (max-width: 680px) {
+  /* Stack the bar into two rows: scrollable materials on top, controls below */
+  #ui {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    transform: none;
+    max-width: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    border-radius: 22px;
+    padding: 8px 10px;
+  }
+
+  #toolbar {
+    width: 100%;
+  }
+
+  #controls {
+    width: 100%;
+  }
+
+  /* Brush group absorbs leftover space; buttons keep their size */
+  #brush-controls {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  #brush-size {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+  }
+
+  #controls > .icon-btn,
+  #controls > #clear-btn {
+    flex: 0 0 auto;
+  }
+
+  /* Let toast / scenario hint wrap instead of overflowing */
+  #hint,
+  #scenario-bar {
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .scenario-emoji {
+    font-size: 24px;
+  }
+
+  .scenario-card {
+    padding: 12px 13px;
+  }
+}
+
+/* Touch / coarse pointers: enlarge tap targets for easier selection */
+@media (pointer: coarse) {
+  .mat-btn {
+    padding: 7px 13px;
+    font-size: 13px;
+  }
+
+  .icon-btn {
+    padding: 7px 12px;
+    font-size: 15px;
+  }
 }

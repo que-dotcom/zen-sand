@@ -13,43 +13,43 @@ const CELL_SIZE = 4;
 // ─── Material palette ────────────────────────────────────────────────────────
 const PALETTE = [
   // 燃焼系
-  { id: SAND,   label: '砂',   color: '#C2A35A', key: '1' },
-  { id: WATER,  label: '水',   color: '#3A7BD5', key: '2' },
-  { id: SNOW,   label: '雪',   color: '#EEEEFF', key: '3' },
-  { id: FIRE,   label: '火',   color: '#FF6600', key: '4' },
-  { id: OIL,    label: '油',   color: '#8B6914', key: '5' },
-  { id: LAVA,   label: '溶岩', color: '#FF4500', key: '6' },
-  { id: COAL,   label: '炭',   color: '#333333', key: '7' },
-  { id: WALL,   label: '壁',   color: '#888888', key: '8' },
+  { id: SAND,   label: '砂',   color: '#C2A35A', key: '1', group: '燃焼' },
+  { id: WATER,  label: '水',   color: '#3A7BD5', key: '2', group: '燃焼' },
+  { id: SNOW,   label: '雪',   color: '#EEEEFF', key: '3', group: '燃焼' },
+  { id: FIRE,   label: '火',   color: '#FF6600', key: '4', group: '燃焼' },
+  { id: OIL,    label: '油',   color: '#8B6914', key: '5', group: '燃焼' },
+  { id: LAVA,   label: '溶岩', color: '#FF4500', key: '6', group: '燃焼' },
+  { id: COAL,   label: '炭',   color: '#333333', key: '7', group: '燃焼' },
+  { id: WALL,   label: '壁',   color: '#888888', key: '8', group: '燃焼' },
   // 生命系
-  { id: SOIL,      label: '土(落)', color: '#5C3D1E', key: 'q' },
-  { id: HARD_SOIL, label: '土(固)', color: '#C47A45', key: 'a' },
-  { id: SEED,   label: '種',   color: '#A8C060', key: 'w' },
-  { id: FUNGUS, label: '菌',   color: '#4A2060', key: 'e' },
+  { id: SOIL,      label: '土(落)', color: '#5C3D1E', key: 'q', group: '生命' },
+  { id: HARD_SOIL, label: '土(固)', color: '#C47A45', key: 'a', group: '生命' },
+  { id: SEED,   label: '種',   color: '#A8C060', key: 'w', group: '生命' },
+  { id: FUNGUS, label: '菌',   color: '#4A2060', key: 'e', group: '生命' },
   // 電気系
-  { id: METAL,     label: '金属', color: '#B0B8C8', key: 'r' },
-  { id: LIGHTNING, label: '雷',   color: '#EEEEFF', key: 't' },
+  { id: METAL,     label: '金属', color: '#B0B8C8', key: 'r', group: '電気' },
+  { id: LIGHTNING, label: '雷',   color: '#EEEEFF', key: 't', group: '電気' },
   // 液体・気体系
-  { id: STEAM,  label: '蒸気', color: '#DDEEFF', key: 'y' },
-  { id: ACID,   label: '酸',   color: '#66FF33', key: 'u' },
-  { id: MUD,    label: '泥',   color: '#6B4226', key: 'i' },
-  { id: ICE,    label: '氷',   color: '#AADDFF', key: 'o' },
+  { id: STEAM,  label: '蒸気', color: '#DDEEFF', key: 'y', group: '気液' },
+  { id: ACID,   label: '酸',   color: '#66FF33', key: 'u', group: '気液' },
+  { id: MUD,    label: '泥',   color: '#6B4226', key: 'i', group: '気液' },
+  { id: ICE,    label: '氷',   color: '#AADDFF', key: 'o', group: '気液' },
   // P3 素材
-  { id: ACID_PLANT, label: '酸植物', color: '#5A9900', key: 'p' },
-  { id: OBSIDIAN,   label: '黒曜石', color: '#1A1A2E', key: 's' },
-  { id: SANDSTONE,  label: '砂岩',   color: '#C4A35A', key: 'd' },
-  { id: BASALT,     label: '玄武岩', color: '#2A1A1A', key: 'f' },
-  { id: SPRING,      label: '水源',   color: '#1A88DD', key: 'g' },
-  { id: LAVA_SPRING, label: '溶岩源', color: '#FF3300', key: 'h' },
+  { id: ACID_PLANT, label: '酸植物', color: '#5A9900', key: 'p', group: '岩石' },
+  { id: OBSIDIAN,   label: '黒曜石', color: '#1A1A2E', key: 's', group: '岩石' },
+  { id: SANDSTONE,  label: '砂岩',   color: '#C4A35A', key: 'd', group: '岩石' },
+  { id: BASALT,     label: '玄武岩', color: '#2A1A1A', key: 'f', group: '岩石' },
+  { id: SPRING,      label: '水源',   color: '#1A88DD', key: 'g', group: '岩石' },
+  { id: LAVA_SPRING, label: '溶岩源', color: '#FF3300', key: 'h', group: '岩石' },
   // 侘び寂び
-  { id: SAKURA_SEED,  label: '桜種',  color: '#C0784E', key: 'j' },
-  { id: SAKURA_PETAL, label: '花びら', color: '#FFB7C5', key: 'k' },
-  { id: FIREFLY,      label: '蛍',    color: '#FFFF44', key: 'l' },
-  { id: POLLEN,       label: '花粉',  color: '#FFEE44', key: 'z' },
-  { id: MA_VOID,      label: '間',    color: '#08080C', key: 'x' },
-  { id: KOI,          label: '鯉',    color: '#E04020', key: 'c' },
+  { id: SAKURA_SEED,  label: '桜種',  color: '#C0784E', key: 'j', group: '侘寂' },
+  { id: SAKURA_PETAL, label: '花びら', color: '#FFB7C5', key: 'k', group: '侘寂' },
+  { id: FIREFLY,      label: '蛍',    color: '#FFFF44', key: 'l', group: '侘寂' },
+  { id: POLLEN,       label: '花粉',  color: '#FFEE44', key: 'z', group: '侘寂' },
+  { id: MA_VOID,      label: '間',    color: '#08080C', key: 'x', group: '侘寂' },
+  { id: KOI,          label: '鯉',    color: '#E04020', key: 'c', group: '侘寂' },
   // ツール
-  { id: EMPTY,  label: '消',   color: '#555555', key: '0' },
+  { id: EMPTY,  label: '消',   color: '#555555', key: '0', group: 'ツール' },
 ];
 
 // ─── Rain spawner ────────────────────────────────────────────────────────────
@@ -219,10 +219,20 @@ function init() {
 
   // ── UI: material buttons ──────────────────────────────────────────────────
   const toolbar = document.getElementById('toolbar');
+  let prevGroup = null;
   PALETTE.forEach(mat => {
+    // Insert a thin divider between material groups for easier scanning
+    if (prevGroup !== null && mat.group !== prevGroup) {
+      const div = document.createElement('span');
+      div.className = 'divider';
+      toolbar.appendChild(div);
+    }
+    prevGroup = mat.group;
+
     const btn = document.createElement('button');
     btn.className   = 'mat-btn';
     btn.dataset.id  = mat.id;
+    btn.title       = `${mat.label}  [${mat.key}]`;
     btn.innerHTML   = `<span class="dot" style="background:${mat.color}"></span>${mat.label}`;
     btn.addEventListener('click', () => selectMaterial(mat.id));
     toolbar.appendChild(btn);
@@ -230,8 +240,16 @@ function init() {
 
   function selectMaterial(id) {
     input.material = id;
-    document.querySelectorAll('.mat-btn').forEach(b =>
-      b.classList.toggle('active', Number(b.dataset.id) === id));
+    let activeBtn = null;
+    document.querySelectorAll('.mat-btn').forEach(b => {
+      const on = Number(b.dataset.id) === id;
+      b.classList.toggle('active', on);
+      if (on) activeBtn = b;
+    });
+    // Keep the selected material visible within the scrollable strip
+    if (activeBtn) {
+      activeBtn.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
     const found = PALETTE.find(p => p.id === id);
     if (found) showHint(`選択: ${found.label}  [${found.key}]`);
   }
