@@ -10,6 +10,9 @@ import { SCENARIOS, MATERIAL_TRIGGER_MAP } from './scenarios.js';
 
 const CELL_SIZE = 4;
 
+// 素材ではない「道具」のパレットID（負数 = engine.set に渡らない）
+const RAKE_TOOL = -1;
+
 // ─── Material palette ────────────────────────────────────────────────────────
 const PALETTE = [
   // 燃焼系
@@ -49,7 +52,8 @@ const PALETTE = [
   { id: MA_VOID,      label: '間',    color: '#08080C', key: 'x', group: '侘寂' },
   { id: KOI,          label: '鯉',    color: '#E04020', key: 'c', group: '侘寂' },
   // ツール
-  { id: EMPTY,  label: '消',   color: '#555555', key: '0', group: 'ツール' },
+  { id: RAKE_TOOL, label: '熊手', color: '#C8A860', key: 'v', group: 'ツール' },
+  { id: EMPTY,     label: '消',   color: '#555555', key: '0', group: 'ツール' },
 ];
 
 // ─── Rain spawner ────────────────────────────────────────────────────────────
@@ -69,7 +73,7 @@ class Spawner {
     this.tick = 0;
 
     const mat = this.input.material;
-    if (mat === EMPTY || mat === WALL) return;
+    if (mat === EMPTY || mat === WALL || this.input.tool !== 'brush') return;
 
     const { width } = this.engine;
     const spread  = Math.floor(width * 0.6);
@@ -239,7 +243,12 @@ function init() {
   });
 
   function selectMaterial(id) {
-    input.material = id;
+    if (id === RAKE_TOOL) {
+      input.tool = 'rake'; // 素材は据え置き（熊手は色だけ書き換える道具）
+    } else {
+      input.tool = 'brush';
+      input.material = id;
+    }
     let activeBtn = null;
     document.querySelectorAll('.mat-btn').forEach(b => {
       const on = Number(b.dataset.id) === id;
