@@ -7,6 +7,8 @@ import { EMPTY, SAND, WATER, WALL, SNOW, FIRE, OIL, LAVA, COAL,
          ACID_PLANT, OBSIDIAN, SANDSTONE, BASALT, SPRING, LAVA_SPRING,
          SAKURA_SEED, SAKURA_PETAL, FIREFLY, POLLEN, MA_VOID, KOI } from './materials.js';
 import { SCENARIOS, MATERIAL_TRIGGER_MAP } from './scenarios.js';
+import { ZenAudio }    from './audio.js';
+import { ChiriRitual } from './ritual.js';
 
 const CELL_SIZE = 4;
 
@@ -106,6 +108,19 @@ function init() {
   const renderer = new Renderer(canvas, engine, CELL_SIZE);
   const input    = new InputHandler(canvas, engine, CELL_SIZE);
   const spawner  = new Spawner(engine, input);
+  const audio    = new ZenAudio();
+  const ritual   = new ChiriRitual(engine);
+
+  // ── 音のトリガ（水琴窟）──────────────────────────────────────────────────
+  // AudioContext はユーザ操作後にしか作れないため、pointerdown で ensure する
+  canvas.addEventListener('pointerdown', () => {
+    audio.ensure();
+    if (input.tool === 'rake')            audio.scrape();
+    else if (input.material === WATER)    audio.drip();
+  });
+  canvas.addEventListener('pointermove', () => {
+    if (input.isDrawing && input.tool === 'rake') audio.scrape();
+  });
 
   window.addEventListener('resize', () => {
     const { w: nw, h: nh } = resize();
@@ -284,6 +299,25 @@ function init() {
     showHint(spawner.enabled ? '雨モード ON ☁' : '雨モード OFF');
   });
 
+  // ── UI: sound toggle ─────────────────────────────────────────────────────
+  const soundBtn = document.getElementById('sound-btn');
+  soundBtn.addEventListener('click', () => {
+    audio.ensure();
+    audio.setMuted(!audio.muted);
+    soundBtn.textContent = audio.muted ? '🔕' : '🔔';
+    showHint(audio.muted ? '音 OFF' : '音 ON — 水琴窟');
+  });
+
+  // ── UI: 散（風の掃き消し）────────────────────────────────────────────────
+  const chiriBtn = document.getElementById('chiri-btn');
+  chiriBtn.addEventListener('click', () => {
+    if (ritual.active) return;
+    audio.ensure();
+    ritual.start();
+    audio.wind(ritual.duration / 60); // 60fps 換算の秒数だけ風が吹く
+    showHint('散 — すべては風に還る');
+  });
+
   // ── UI: clear ────────────────────────────────────────────────────────────
   document.getElementById('clear-btn').addEventListener('click', () => {
     engine.clear();
@@ -292,9 +326,28 @@ function init() {
   });
 
   // ── Game loop ─────────────────────────────────────────────────────────────
+  let frame = 0;
+  let waterPresent = false;
   function loop() {
     spawner.update();
     engine.update();
+    if (ritual.step() === 'done') {
+      activeScenario = null;
+      updateScenarioBar();
+      audio.bell();
+      showHint('無');
+    }
+    // 水の在否を毎秒まばらに標本調査（環境音の雫用）
+    if (++frame % 60 === 0) {
+      waterPresent = false;
+      for (let i = 0; i < 200; i++) {
+        if (engine.cells[Math.floor(Math.random() * engine.cells.length)] === WATER) {
+          waterPresent = true;
+          break;
+        }
+      }
+    }
+    audio.ambientTick(waterPresent);
     renderer.render();
     checkActProgress();
     requestAnimationFrame(loop);
