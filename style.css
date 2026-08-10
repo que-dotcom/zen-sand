@@ -18,72 +18,80 @@ body {
   touch-action: none;
 }
 
+/* ─── Bottom bar: 3行構造 ───────────────────────────────────────────────────
+   行0 グループタブ / 行1 選択中グループの素材 / 行2 操作。
+   横スクロールは使わない。どのタブを選んでも素材は最大6個なので必ず収まる。   */
 #ui {
   position: fixed;
   bottom: 18px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
   max-width: min(1100px, calc(100vw - 24px));
   background: rgba(10, 10, 10, 0.75);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 50px;
-  padding: 8px 14px;
+  border-radius: 22px;
+  padding: 2px 14px 6px;
 }
 
-#toolbar {
+/* 3つの行はすべて「左右に並んだ項目の列」という同じ形にしてある。
+   この同型性が PR2 以降のキーボード2次元ナビゲーションの前提になる。 */
+.nav-row {
   display: flex;
   align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
   gap: 4px;
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-behavior: smooth;
-  scroll-padding-inline: 16px;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
-  /* Fade both edges to hint horizontal scrollability */
-  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
-  mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+  min-height: 34px;
 }
 
-#toolbar::-webkit-scrollbar {
-  height: 4px;
+/* 3行構造を視覚的に示す薄い区切り */
+.nav-row + .nav-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
 
-#toolbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-}
+#mat-row  { gap: 6px; min-height: 38px; }
+#controls { gap: 6px; }
 
-#toolbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-#controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* ─── 行0: グループタブ ──────────────────────────────────────────────────── */
+.tab-btn {
   flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 6px 11px 4px;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
 }
 
+.tab-btn:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.tab-btn.active {
+  color: #fff;
+  border-bottom-color: rgba(255, 255, 255, 0.75);
+}
+
+/* ─── 行1: 素材 ─────────────────────────────────────────────────────────── */
 .mat-btn {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 7px;
   flex: 0 0 auto;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 20px;
-  padding: 5px 11px;
+  padding: 6px 13px;
   color: rgba(255, 255, 255, 0.5);
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
@@ -100,40 +108,40 @@ body {
   background: rgba(255, 255, 255, 0.08);
 }
 
+/* 離れた席からも色で素材を見分けられるよう 8px → 12px に拡大した */
 .dot {
-  width: 8px;
-  height: 8px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   display: inline-block;
   flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
 }
 
-.divider {
-  width: 1px;
-  height: 20px;
-  margin: 0 3px;
-  background: rgba(255, 255, 255, 0.12);
-  flex-shrink: 0;
-}
-
-#brush-controls {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
+/* ─── 行2: 操作 ─────────────────────────────────────────────────────────── */
 .ui-label {
   color: rgba(255, 255, 255, 0.35);
   font-size: 11px;
 }
 
-#brush-size {
-  width: 64px;
-  accent-color: rgba(255, 255, 255, 0.5);
-  cursor: pointer;
+#brush-val {
+  min-width: 14px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
-.icon-btn {
+.ctl-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+}
+
+.ctl-btn {
+  flex: 0 0 auto;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 20px;
@@ -145,22 +153,18 @@ body {
   line-height: 1;
 }
 
-.icon-btn:hover,
-.icon-btn.active {
+.ctl-btn:hover,
+.ctl-btn.active {
   border-color: rgba(255, 255, 255, 0.3);
   color: rgba(255, 255, 255, 0.9);
   background: rgba(255, 255, 255, 0.07);
 }
 
 #clear-btn {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 20px;
+  border-color: rgba(255, 255, 255, 0.15);
   padding: 5px 14px;
   color: rgba(255, 255, 255, 0.4);
   font-size: 12px;
-  cursor: pointer;
-  transition: all 0.15s ease;
 }
 
 #clear-btn:hover {
@@ -350,43 +354,36 @@ body {
 
 /* ─── Responsive: tablet / mobile ─────────────────────────────────────────── */
 @media (max-width: 680px) {
-  /* Stack the bar into two rows: scrollable materials on top, controls below */
+  /* 画面幅いっぱいに広げ、3行構造はそのまま保つ */
   #ui {
     left: 8px;
     right: 8px;
     bottom: 8px;
     transform: none;
     max-width: none;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-    border-radius: 22px;
-    padding: 8px 10px;
+    border-radius: 18px;
+    padding: 2px 8px 6px;
   }
 
-  #toolbar {
-    width: 100%;
-  }
-
+  /* 狭い画面では素材行と操作行の折り返しを許す。
+     キーボード操作は据え置き設置（広い画面）を前提にしているので、
+     ここで行が2段になっても PR2 以降の設計には影響しない。 */
+  #mat-row,
   #controls {
-    width: 100%;
+    flex-wrap: wrap;
+    row-gap: 2px;
   }
 
-  /* Brush group absorbs leftover space; buttons keep their size */
-  #brush-controls {
-    flex: 1 1 0;
-    min-width: 0;
+  /* タブ行だけは折り返さず8個を1行に収める（詰めて対応） */
+  .tab-btn {
+    padding: 6px 7px 4px;
+    font-size: 11px;
+    letter-spacing: 0;
   }
 
-  #brush-size {
-    flex: 1 1 0;
-    width: auto;
-    min-width: 0;
-  }
-
-  #controls > .icon-btn,
-  #controls > #clear-btn {
-    flex: 0 0 auto;
+  .mat-btn {
+    padding: 5px 10px;
+    font-size: 12px;
   }
 
   /* Let toast / scenario hint wrap instead of overflowing */
@@ -408,11 +405,15 @@ body {
 /* Touch / coarse pointers: enlarge tap targets for easier selection */
 @media (pointer: coarse) {
   .mat-btn {
-    padding: 7px 13px;
+    padding: 8px 14px;
     font-size: 13px;
   }
 
-  .icon-btn {
+  .tab-btn {
+    padding: 8px 12px 5px;
+  }
+
+  .ctl-btn {
     padding: 7px 12px;
     font-size: 15px;
   }

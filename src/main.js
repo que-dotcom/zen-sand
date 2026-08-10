@@ -16,47 +16,53 @@ const CELL_SIZE = 4;
 const RAKE_TOOL = -1;
 
 // ─── Material palette ────────────────────────────────────────────────────────
+// グループは「タブ1枚 = 1グループ、素材行は最大6個」に収まるよう構成している。
+// どのタブを選んでも素材行が横スクロールしないのが再編の狙い（docs/keyboard-mode-design.md §1）。
 const PALETTE = [
-  // 燃焼系
-  { id: SAND,   label: '砂',   color: '#C2A35A', key: '1', group: '燃焼' },
-  { id: WATER,  label: '水',   color: '#3A7BD5', key: '2', group: '燃焼' },
-  { id: SNOW,   label: '雪',   color: '#EEEEFF', key: '3', group: '燃焼' },
-  { id: FIRE,   label: '火',   color: '#FF6600', key: '4', group: '燃焼' },
-  { id: OIL,    label: '油',   color: '#8B6914', key: '5', group: '燃焼' },
-  { id: LAVA,   label: '溶岩', color: '#FF4500', key: '6', group: '燃焼' },
-  { id: COAL,   label: '炭',   color: '#333333', key: '7', group: '燃焼' },
-  { id: WALL,   label: '壁',   color: '#888888', key: '8', group: '燃焼' },
-  // 生命系
-  { id: SOIL,      label: '土(落)', color: '#5C3D1E', key: 'q', group: '生命' },
-  { id: HARD_SOIL, label: '土(固)', color: '#C47A45', key: 'a', group: '生命' },
-  { id: SEED,   label: '種',   color: '#A8C060', key: 'w', group: '生命' },
-  { id: FUNGUS, label: '菌',   color: '#4A2060', key: 'e', group: '生命' },
-  // 電気系
-  { id: METAL,     label: '金属', color: '#B0B8C8', key: 'r', group: '電気' },
-  { id: LIGHTNING, label: '雷',   color: '#EEEEFF', key: 't', group: '電気' },
-  // 液体・気体系
+  // 基本 — 最初に触る4つ
+  { id: SAND,   label: '砂',   color: '#C2A35A', key: '1', group: '基本' },
+  { id: WATER,  label: '水',   color: '#3A7BD5', key: '2', group: '基本' },
+  { id: SNOW,   label: '雪',   color: '#EEEEFF', key: '3', group: '基本' },
+  { id: WALL,   label: '壁',   color: '#888888', key: '8', group: '基本' },
+  // 火 — 燃える／燃やすもの
+  { id: FIRE,   label: '火',   color: '#FF6600', key: '4', group: '火' },
+  { id: OIL,    label: '油',   color: '#8B6914', key: '5', group: '火' },
+  { id: LAVA,   label: '溶岩', color: '#FF4500', key: '6', group: '火' },
+  { id: COAL,   label: '炭',   color: '#333333', key: '7', group: '火' },
+  // 生命 — 育つもの・育てる土
+  { id: SOIL,       label: '土(落)', color: '#5C3D1E', key: 'q', group: '生命' },
+  { id: HARD_SOIL,  label: '土(固)', color: '#C47A45', key: 'a', group: '生命' },
+  { id: SEED,       label: '種',     color: '#A8C060', key: 'w', group: '生命' },
+  { id: FUNGUS,     label: '菌',     color: '#4A2060', key: 'e', group: '生命' },
+  { id: ACID_PLANT, label: '酸植物', color: '#5A9900', key: 'p', group: '生命' },
+  // 気液 — 流れるもの
   { id: STEAM,  label: '蒸気', color: '#DDEEFF', key: 'y', group: '気液' },
   { id: ACID,   label: '酸',   color: '#66FF33', key: 'u', group: '気液' },
   { id: MUD,    label: '泥',   color: '#6B4226', key: 'i', group: '気液' },
   { id: ICE,    label: '氷',   color: '#AADDFF', key: 'o', group: '気液' },
-  // P3 素材
-  { id: ACID_PLANT, label: '酸植物', color: '#5A9900', key: 'p', group: '岩石' },
-  { id: OBSIDIAN,   label: '黒曜石', color: '#1A1A2E', key: 's', group: '岩石' },
-  { id: SANDSTONE,  label: '砂岩',   color: '#C4A35A', key: 'd', group: '岩石' },
-  { id: BASALT,     label: '玄武岩', color: '#2A1A1A', key: 'f', group: '岩石' },
+  // 岩石 — 動かない地形と湧き出し口
+  { id: OBSIDIAN,    label: '黒曜石', color: '#1A1A2E', key: 's', group: '岩石' },
+  { id: SANDSTONE,   label: '砂岩',   color: '#C4A35A', key: 'd', group: '岩石' },
+  { id: BASALT,      label: '玄武岩', color: '#2A1A1A', key: 'f', group: '岩石' },
   { id: SPRING,      label: '水源',   color: '#1A88DD', key: 'g', group: '岩石' },
   { id: LAVA_SPRING, label: '溶岩源', color: '#FF3300', key: 'h', group: '岩石' },
-  // 侘び寂び
+  // 電気
+  { id: METAL,     label: '金属', color: '#B0B8C8', key: 'r', group: '電気' },
+  { id: LIGHTNING, label: '雷',   color: '#EEEEFF', key: 't', group: '電気' },
+  // 侘寂
   { id: SAKURA_SEED,  label: '桜種',  color: '#C0784E', key: 'j', group: '侘寂' },
   { id: SAKURA_PETAL, label: '花びら', color: '#FFB7C5', key: 'k', group: '侘寂' },
   { id: FIREFLY,      label: '蛍',    color: '#FFFF44', key: 'l', group: '侘寂' },
   { id: POLLEN,       label: '花粉',  color: '#FFEE44', key: 'z', group: '侘寂' },
   { id: MA_VOID,      label: '間',    color: '#08080C', key: 'x', group: '侘寂' },
   { id: KOI,          label: '鯉',    color: '#E04020', key: 'c', group: '侘寂' },
-  // ツール
-  { id: RAKE_TOOL, label: '熊手', color: '#C8A860', key: 'v', group: 'ツール' },
-  { id: EMPTY,     label: '消',   color: '#555555', key: '0', group: 'ツール' },
+  // 道具 — 素材を置かずに庭をいじるもの
+  { id: RAKE_TOOL, label: '熊手', color: '#C8A860', key: 'v', group: '道具' },
+  { id: EMPTY,     label: '消',   color: '#555555', key: '0', group: '道具' },
 ];
+
+// タブの並び順。PALETTE の出現順から重複を除いて作るので、両者がずれることはない。
+const GROUPS = [...new Set(PALETTE.map(m => m.group))];
 
 // ─── Rain spawner ────────────────────────────────────────────────────────────
 class Spawner {
@@ -236,26 +242,53 @@ function init() {
     if (e.target === scenarioModal) closeModal();
   });
 
-  // ── UI: material buttons ──────────────────────────────────────────────────
-  const toolbar = document.getElementById('toolbar');
-  let prevGroup = null;
-  PALETTE.forEach(mat => {
-    // Insert a thin divider between material groups for easier scanning
-    if (prevGroup !== null && mat.group !== prevGroup) {
-      const div = document.createElement('span');
-      div.className = 'divider';
-      toolbar.appendChild(div);
-    }
-    prevGroup = mat.group;
+  // ── UI: group tabs + material row ─────────────────────────────────────────
+  // 「表示中グループ」と「選択中の素材/道具」は別の状態として持つ。
+  // 熊手（道具グループ）を選んだまま別グループのタブを眺める状態があり得るため、
+  // タブは表示を切り替えるだけで、実際に描くものは選択操作でしか変わらない。
+  const groupTabs = document.getElementById('group-tabs');
+  const matRow    = document.getElementById('mat-row');
 
-    const btn = document.createElement('button');
-    btn.className   = 'mat-btn';
-    btn.dataset.id  = mat.id;
-    btn.title       = `${mat.label}  [${mat.key}]`;
-    btn.innerHTML   = `<span class="dot" style="background:${mat.color}"></span>${mat.label}`;
-    btn.addEventListener('click', () => selectMaterial(mat.id));
-    toolbar.appendChild(btn);
+  let activeGroup = GROUPS[0];
+  let selectedId  = null;
+
+  GROUPS.forEach(group => {
+    const tab = document.createElement('button');
+    tab.className     = 'tab-btn';
+    tab.dataset.group = group;
+    tab.textContent   = group;
+    tab.addEventListener('click', () => showGroup(group));
+    groupTabs.appendChild(tab);
   });
+
+  // 表示グループを切り替える（選択中の素材はそのまま）
+  function showGroup(group) {
+    activeGroup = group;
+    groupTabs.querySelectorAll('.tab-btn').forEach(t => {
+      t.classList.toggle('active', t.dataset.group === group);
+    });
+    renderMatRow();
+  }
+
+  // 素材行は表示グループの分だけ作り直す。最大6個なので毎回全消しで作っても軽い。
+  function renderMatRow() {
+    matRow.replaceChildren();
+    PALETTE.filter(m => m.group === activeGroup).forEach(mat => {
+      const btn = document.createElement('button');
+      btn.className  = 'mat-btn';
+      btn.dataset.id = mat.id;
+      btn.title      = `${mat.label}  [${mat.key}]`;
+      btn.classList.toggle('active', mat.id === selectedId);
+
+      const dot = document.createElement('span');
+      dot.className        = 'dot';
+      dot.style.background = mat.color;
+      btn.append(dot, mat.label);
+
+      btn.addEventListener('click', () => selectMaterial(mat.id));
+      matRow.appendChild(btn);
+    });
+  }
 
   function selectMaterial(id) {
     if (id === RAKE_TOOL) {
@@ -264,18 +297,17 @@ function init() {
       input.tool = 'brush';
       input.material = id;
     }
-    let activeBtn = null;
-    document.querySelectorAll('.mat-btn').forEach(b => {
-      const on = Number(b.dataset.id) === id;
-      b.classList.toggle('active', on);
-      if (on) activeBtn = b;
-    });
-    // Keep the selected material visible within the scrollable strip
-    if (activeBtn) {
-      activeBtn.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    }
+    selectedId = id;
+
+    // 選んだものが必ず画面に見えているよう、そのグループのタブを開く
+    // （キー入力で選んだ時に「選択したのに素材行に無い」が起きないようにする）
     const found = PALETTE.find(p => p.id === id);
-    if (found) showHint(`選択: ${found.label}  [${found.key}]`);
+    if (found) {
+      showGroup(found.group); // renderMatRow はこの中で走る
+      showHint(`選択: ${found.label}  [${found.key}]`);
+    } else {
+      renderMatRow();
+    }
   }
   selectMaterial(SAND);
 
@@ -286,10 +318,22 @@ function init() {
   });
 
   // ── UI: brush size ────────────────────────────────────────────────────────
-  const brushSlider = document.getElementById('brush-size');
-  brushSlider.addEventListener('input', () => {
-    input.brushRadius = Number(brushSlider.value);
-  });
+  // スライダーではなく ⊖ / ⊕ の2ボタンにする。<input type="range"> はキーボードだと
+  // 「左右で値変更」になり、他の行の「左右で項目移動」と衝突するため
+  // （docs/keyboard-mode-design.md §2）。範囲・初期値はスライダー時代と同じ。
+  const BRUSH_MIN = 1;
+  const BRUSH_MAX = 8;
+  const brushVal  = document.getElementById('brush-val');
+
+  function setBrush(r) {
+    input.brushRadius    = Math.min(BRUSH_MAX, Math.max(BRUSH_MIN, r));
+    brushVal.textContent = input.brushRadius;
+  }
+  document.getElementById('brush-dec')
+    .addEventListener('click', () => setBrush(input.brushRadius - 1));
+  document.getElementById('brush-inc')
+    .addEventListener('click', () => setBrush(input.brushRadius + 1));
+  setBrush(input.brushRadius);
 
   // ── UI: rain toggle ───────────────────────────────────────────────────────
   const rainBtn = document.getElementById('rain-btn');

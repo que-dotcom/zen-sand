@@ -15,19 +15,23 @@
   <!-- Scenario act hint bar (persistent) -->
   <div id="scenario-bar"></div>
 
-  <!-- Main UI bar -->
+  <!-- Main UI bar — 3行構造: グループタブ / 素材 / 操作
+       全ての行が「左右に並んだ項目の列」という同じ形をしている。
+       これがそのまま PR2 以降のキーボード2次元ナビゲーションになる。 -->
   <div id="ui">
-    <div id="toolbar"></div>
-    <div id="controls">
-      <div id="brush-controls">
-        <span class="ui-label">ブラシ</span>
-        <input type="range" id="brush-size" min="1" max="8" value="3">
-      </div>
-      <button id="scenario-btn" class="icon-btn" title="シナリオ">🎬</button>
-      <button id="rain-btn" class="icon-btn" title="雨モード（トグル）">☁</button>
-      <button id="sound-btn" class="icon-btn" title="音（水琴窟）">🔔</button>
-      <button id="chiri-btn" class="icon-btn" title="散 — 風がすべてを掃き消す">🍃</button>
-      <button id="clear-btn">クリア</button>
+    <div class="nav-row" id="group-tabs"></div>
+    <div class="nav-row" id="mat-row"></div>
+    <div class="nav-row" id="controls">
+      <span class="ui-label">ブラシ</span>
+      <button id="brush-dec" class="ctl-btn" title="ブラシを小さく">⊖</button>
+      <span id="brush-val">3</span>
+      <button id="brush-inc" class="ctl-btn" title="ブラシを大きく">⊕</button>
+      <span class="ctl-sep"></span>
+      <button id="scenario-btn" class="ctl-btn" title="シナリオ">🎬</button>
+      <button id="rain-btn" class="ctl-btn" title="雨モード（トグル）">☁</button>
+      <button id="sound-btn" class="ctl-btn" title="音（水琴窟）">🔔</button>
+      <button id="chiri-btn" class="ctl-btn" title="散 — 風がすべてを掃き消す">🍃</button>
+      <button id="clear-btn" class="ctl-btn">クリア</button>
     </div>
   </div>
 
