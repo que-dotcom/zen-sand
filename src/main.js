@@ -5,7 +5,7 @@ import { EMPTY, SAND, WATER, WALL, SNOW, FIRE, OIL, LAVA, COAL,
          SOIL, SEED, FUNGUS, METAL, LIGHTNING,
          STEAM, ACID, MUD, ICE, HARD_SOIL,
          ACID_PLANT, OBSIDIAN, SANDSTONE, BASALT, SPRING, LAVA_SPRING,
-         SAKURA_SEED, SAKURA_PETAL, FIREFLY, POLLEN, MA_VOID, KOI } from './materials.js';
+         SAKURA_SEED, SAKURA_PETAL, FIREFLY, POLLEN, MA_VOID, KOI, GOLD } from './materials.js';
 import { SCENARIOS, MATERIAL_TRIGGER_MAP } from './scenarios.js';
 import { ZenAudio }    from './audio.js';
 import { ChiriRitual } from './ritual.js';
@@ -34,6 +34,7 @@ const PALETTE = [
   // 電気系
   { id: METAL,     label: '金属', color: '#B0B8C8', key: 'r', group: '電気' },
   { id: LIGHTNING, label: '雷',   color: '#EEEEFF', key: 't', group: '電気' },
+  { id: GOLD,      label: '金',   color: '#FFC63A', key: 'n', group: '電気' },
   // 液体・気体系
   { id: STEAM,  label: '蒸気', color: '#DDEEFF', key: 'y', group: '気液' },
   { id: ACID,   label: '酸',   color: '#66FF33', key: 'u', group: '気液' },

@@ -1,5 +1,5 @@
 import {
-  STONE, WALL, BASALT, METAL, SANDSTONE, OBSIDIAN, GLASS
+  STONE, WALL, BASALT, METAL, SANDSTONE, OBSIDIAN, GLASS, KINTSUGI
 } from './ids.js';
 
 // ─── Plant meta encoding (Uint8) ──────────────────────────────────────────────
@@ -53,11 +53,15 @@ export const KOI_COLS = [0xFFFFFF, 0xEEEEEE, 0xEE3322, 0xDD2211, 0x111111, 0x222
 export const KOI_DIRS = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
 // 振動波（VIBRATION）
 export const VIBRATION_COLS = [0xFFFFFF, 0xEEEEFF, 0xDDDDFF]; // 白青の閃光色
+// 金（溶融金）: 白熱した山吹色のゆらめき
+export const GOLD_COLS     = [0xFFC63A, 0xFFB825, 0xFFD34D, 0xF2A91C, 0xFFCC33, 0xE89E18];
+// 金継ぎ: 固まった漆金。落ち着いた金箔の色幅
+export const KINTSUGI_COLS = [0xFFD700, 0xE8C048, 0xD4AF37, 0xF5D060, 0xC9A227];
 
 // 伝導体インデックステーブル（3ビットで表現 → meta に収める鍵）
-// index: 0=STONE  1=WALL  2=BASALT  3=METAL  4=SANDSTONE  5=OBSIDIAN  6=GLASS
-// Phase 1 では 0(STONE) と 1(WALL) のみ通過可能
-export const CONDUCTOR_IDS = [STONE, WALL, BASALT, METAL, SANDSTONE, OBSIDIAN, GLASS];
+// index: 0=STONE  1=WALL  2=BASALT  3=METAL  4=SANDSTONE  5=OBSIDIAN  6=GLASS  7=KINTSUGI
+// 3ビット（0-7）の最後の枠を KINTSUGI が使用。これ以上は追加できない
+export const CONDUCTOR_IDS = [STONE, WALL, BASALT, METAL, SANDSTONE, OBSIDIAN, GLASS, KINTSUGI];
 
 // VIBRATION meta エンコード定数（8ビット = 元素材3 + 方向3 + 強度2）
 //   bit 2-0 (VIB_MAT_MASK) : 元素材インデックス（CONDUCTOR_IDS の添字）
