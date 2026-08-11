@@ -13,7 +13,7 @@ import { Engine } from '../src/engine.js';
 import { PracticeMode, DRILLS, stageFrame } from '../src/practice.js';
 import * as ids from '../src/materials/ids.js';
 
-const { EMPTY, FIRE, WATER, LIGHTNING, LAVA, OIL, SEED, GOLD, SNOW } = ids;
+const { EMPTY, FIRE, WATER, LIGHTNING, LAVA, OIL, SEED, GOLD, SNOW, METAL } = ids;
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'out');
 mkdirSync(OUT, { recursive: true });
@@ -92,6 +92,8 @@ const ANSWERS = {
   },
   freeze:   f => { if (f % 2 === 0)  engine.set(cx + ((f * 5) % 99) - 49, H - 8, SNOW); },
   spark:    f => { if (f % 10 === 0) engine.set(20 + ((f * 7) % 160), H - 10, LIGHTNING); },
+  'rust-sea': f => { if (f % 3 === 0) engine.set(20 + ((f * 7) % 160), H - 32, METAL); },
+  'firefly-brook': f => { if (f % 3 === 0) engine.set(18 + ((f * 11) % 164), H - 22, WATER); },
   kintsugi: f => { if (f % 4 === 0)  engine.set(cx + (f % 2), H - 21, GOLD); },
 };
 

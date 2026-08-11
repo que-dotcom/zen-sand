@@ -1,7 +1,7 @@
 import {
   EMPTY, STONE, SAND, WATER, LAVA, OIL, COAL, SOIL, MUD, GLASS,
   OBSIDIAN, SANDSTONE, BASALT, STEAM, FIRE, PLANT, DARK_PLANT, FLOWER, SPARK, KINTSUGI,
-  FUNGUS, GLOW_FUNGUS, ICE, LAVA_SPRING, HARD_SOIL,
+  FUNGUS, GLOW_FUNGUS, ICE, LAVA_SPRING, HARD_SOIL, METAL, RUST, FIREFLY,
 } from './materials.js';
 
 // ─── 実験帳 (Practice Mode) ──────────────────────────────────────────────────
@@ -43,7 +43,7 @@ export function stageFrame(engine) {
   };
 }
 
-// ─── お題13題 ────────────────────────────────────────────────────────────────
+// ─── お題16題 ────────────────────────────────────────────────────────────────
 // products: 数える生成物 / goal: 成功に必要な増分（ベースライン比）
 
 export const DRILLS = [
@@ -259,6 +259,31 @@ export const DRILLS = [
       // 水面から顔を出す岩の小島
       fillRect(e, Math.floor(W * 0.34), H - 5, Math.floor(W * 0.36), H - 2, STONE);
       fillRect(e, Math.floor(W * 0.62), H - 5, Math.floor(W * 0.63), H - 2, STONE);
+    },
+  },
+  {
+    id: 'rust-sea', title: '錆の海', goal: 8, products: [RUST],
+    hint: '水辺の石浜に、金属 [r] を沈めよう',
+    done: '波の底で、鉄は赤い砂になった',
+    setup(e) {
+      const { W, H } = stageFrame(e);
+      fillRect(e, 0, H - 3, W - 1, H - 1, STONE);
+      // 広い入江。石の地表と水面を揃え、上から落とした金属が水に届くようにする
+      fillRect(e, Math.floor(W * 0.04), H - Math.max(18, Math.floor(H * 0.13)),
+        Math.floor(W * 0.96), H - 4, WATER);
+    },
+  },
+  {
+    id: 'firefly-brook', title: '蛍の沢', goal: 8, products: [FIREFLY],
+    hint: '草むらの沢に、水 [2] を注ごう',
+    done: '草のあいだに、淡い灯がともる',
+    setup(e) {
+      const { W, H } = stageFrame(e);
+      fillRect(e, 0, H - 3, W - 1, H - 1, SOIL);
+      // 沢が満ちるのを待つ低い草むら。水を注ぐと、近くの草から蛍が生まれる
+      for (let x = Math.max(6, Math.floor(W * 0.03)); x < W - Math.max(6, Math.floor(W * 0.03)); x += 4) {
+        for (let y = H - 4; y >= H - Math.max(14, Math.floor(H * 0.10)); y -= 2) set(e, x, y, PLANT);
+      }
     },
   },
   {
