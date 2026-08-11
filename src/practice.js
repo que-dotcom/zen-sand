@@ -1,18 +1,22 @@
 import {
-  EMPTY, WALL, STONE, SAND, WATER, LAVA, SOIL, MUD, GLASS,
+  EMPTY, STONE, SAND, WATER, LAVA, SOIL, MUD, GLASS,
   OBSIDIAN, BASALT, STEAM, FIRE, PLANT, FLOWER, SPARK, KINTSUGI,
   ICE, LAVA_SPRING, HARD_SOIL,
 } from './materials.js';
 
 // ─── 実験帳 (Practice Mode) ──────────────────────────────────────────────────
 //
-// シナリオとは別の練習モード。お題の化学反応ごとに小さな「情景」を自動設置し、
+// シナリオとは別の練習モード。お題の化学反応ごとに「画面全体の情景」を設置し、
 // プレイヤーが素材を注いで反応を起こす。成功判定は「生成物のセル数が
 // ベースラインから goal 以上増えたか」を毎フレーム数えるだけ —— 素材コードには
 // 一切手を入れない汎用方式。成功したら約2秒の余韻ののち次のお題へ進む。
 //
-// 舞台は受け皿ではなく地形で作る: 草原・岩間の泉・溶岩の流れる山肌・砂丘・
-// 火口・泥田・畑・池・石碑。フィールドの上で反応が「見えて分かる」ことを優先する。
+// 設計原則:
+// - 舞台は画面の底から積み上げ、幅いっぱいに広げる（画面端が壁の役割をするので
+//   枠は不要。空中の小さな受け皿は見づらい）
+// - プレイヤーに置かせる素材は「落ちる・流れる」ものだけ（火・水・溶岩・雷・雪・
+//   種・金）。氷のような固定素材は空中に貼り付いて反応できず、
+//   「反応しているのに判定されない」体験になるため使わせない
 
 // ─── 舞台設置ヘルパー ────────────────────────────────────────────────────────
 
@@ -23,39 +27,20 @@ function fillRect(e, x0, y0, x1, y1, type) {
     for (let x = x0; x <= x1; x++) set(e, x, y, type);
 }
 
-function hLine(e, x0, x1, y, type) { for (let x = x0; x <= x1; x++) set(e, x, y, type); }
-function vLine(e, x, y0, y1, type) { for (let y = y0; y <= y1; y++) set(e, x, y, type); }
+// 三角の山（砂丘・火山・畝に使う）。基部の半幅 = h
+function mound(e, mx, baseY, h, mat) {
+  for (let dy = 0; dy < h; dy++) {
+    for (let x = mx - (h - dy - 1); x <= mx + (h - dy - 1); x++) set(e, x, baseY - dy, mat);
+  }
+}
 
 // 舞台の基準座標（テストからも同じ式で参照する）
 export function stageFrame(engine) {
   return {
+    W: engine.width,
+    H: engine.height,
     cx: Math.floor(engine.width / 2),
-    y0: Math.floor(engine.height * 0.66), // 舞台の床の高さ
   };
-}
-
-// 庭の枠: 床 + 低い縁（液体の流出を留める）
-function frame(e, cx, y0, halfW, lip = 2) {
-  hLine(e, cx - halfW, cx + halfW, y0, WALL);
-  vLine(e, cx - halfW, y0 - lip, y0, WALL);
-  vLine(e, cx + halfW, y0 - lip, y0, WALL);
-}
-
-// 三角の山（砂丘・火山・畝に使う）。基部の半幅 = h
-function mound(e, mx, baseY, h, mat) {
-  for (let dy = 0; dy < h; dy++) {
-    hLine(e, mx - (h - dy - 1), mx + (h - dy - 1), baseY - dy, mat);
-  }
-}
-
-// 中央に窪みをもつ左右の岩の土手（泉・池の岸）
-function rockyBanks(e, cx, y0, halfW, pondHalfW, maxH) {
-  for (let x = cx - halfW + 1; x <= cx + halfW - 1; x++) {
-    const d = Math.abs(x - cx);
-    if (d <= pondHalfW) continue;
-    const h = Math.min(maxH, 1 + Math.floor((d - pondHalfW) / 3));
-    fillRect(e, x, y0 - h, x, y0 - 1, STONE);
-  }
 }
 
 // ─── お題10題 ────────────────────────────────────────────────────────────────
@@ -67,14 +52,13 @@ export const DRILLS = [
     hint: '乾いた草原に、火 [4] を放とう',
     done: '炎は草を走り、あとに灰が残る',
     setup(e) {
-      const { cx, y0 } = stageFrame(e);
-      frame(e, cx, y0, 34);
-      fillRect(e, cx - 33, y0 - 2, cx + 33, y0 - 1, SOIL);
-      for (let x = cx - 31; x <= cx + 31; x++) {
+      const { W, H } = stageFrame(e);
+      fillRect(e, 0, H - 3, W - 1, H - 1, SOIL);
+      for (let x = 0; x <= W - 1; x++) {
         if (Math.random() < 0.30) continue; // 疎らな地肌を残す
         const h = 2 + Math.floor(Math.random() * 4);
-        for (let dy = 1; dy <= h; dy++) set(e, x, y0 - 2 - dy, PLANT);
-        if (Math.random() > 0.75) set(e, x, y0 - 3 - h, FLOWER);
+        for (let dy = 1; dy <= h; dy++) set(e, x, H - 3 - dy, PLANT);
+        if (Math.random() > 0.75) set(e, x, H - 4 - h, FLOWER);
       }
     },
   },
@@ -83,10 +67,12 @@ export const DRILLS = [
     hint: '岩間の泉に、火 [4] か溶岩 [6] を沈めよう',
     done: '湯けむりが立ちのぼる',
     setup(e) {
-      const { cx, y0 } = stageFrame(e);
-      frame(e, cx, y0, 34);
-      rockyBanks(e, cx, y0, 34, 12, 6);
-      fillRect(e, cx - 11, y0 - 3, cx + 11, y0 - 1, WATER);
+      const { W, H, cx } = stageFrame(e);
+      const pw = Math.floor(W * 0.15); // 泉の半幅
+      fillRect(e, 0, H - 4, W - 1, H - 1, STONE);      // 地表は水面と同じ高さ（蓋にしない）
+      mound(e, Math.floor(W * 0.15), H - 5, 5, STONE); // 岸の岩
+      mound(e, Math.floor(W * 0.85), H - 5, 4, STONE);
+      fillRect(e, cx - pw, H - 4, cx + pw, H - 2, WATER);
     },
   },
   {
@@ -94,19 +80,21 @@ export const DRILLS = [
     hint: '山肌を流れる溶岩に、水 [2] を注ごう',
     done: '流れは、岩の段になって止まった',
     setup(e) {
-      const { cx, y0 } = stageFrame(e);
-      frame(e, cx, y0, 34, 8);
-      // 左が高い赤土の山肌（固い土は溶岩に溶けない）。溶岩源泉が山頂から流し続ける
-      for (let x = cx - 30; x <= cx + 8; x++) {
-        const h = Math.max(1, Math.round(16 * (cx + 8 - x) / 38));
-        fillRect(e, x, y0 - h, x, y0 - 1, HARD_SOIL);
+      const { W, H } = stageFrame(e);
+      const slopeR = Math.floor(W * 0.55);       // 山裾の右端
+      const hMax   = Math.floor(H * 0.45);       // 山頂の高さ
+      // 左が高い赤土の山肌（固い土は溶岩に溶けない）。右は開けた平地
+      fillRect(e, 0, H - 2, W - 1, H - 1, HARD_SOIL);
+      for (let x = 0; x <= slopeR; x++) {
+        const h = Math.max(2, Math.round(hMax * (slopeR - x) / slopeR));
+        fillRect(e, x, H - 1 - h, x, H - 1, HARD_SOIL);
       }
-      set(e, cx - 30, y0 - 17, LAVA_SPRING);
-      set(e, cx - 29, y0 - 17, LAVA_SPRING);
-      // 最初から山肌を流れ下る溶岩の舌を1本敷いておく（情景がすぐ読める）
-      for (let x = cx - 28; x <= cx - 6; x++) {
-        const h = Math.max(1, Math.round(16 * (cx + 8 - x) / 38));
-        set(e, x, y0 - h - 1, LAVA);
+      // 山頂の溶岩源泉と、最初から流れ下る溶岩の舌
+      set(e, 0, H - 2 - hMax, LAVA_SPRING);
+      set(e, 1, H - 2 - hMax, LAVA_SPRING);
+      for (let x = 2; x <= Math.floor(slopeR * 0.7); x++) {
+        const h = Math.max(2, Math.round(hMax * (slopeR - x) / slopeR));
+        set(e, x, H - 2 - h, LAVA);
       }
     },
   },
@@ -115,26 +103,34 @@ export const DRILLS = [
     hint: '砂丘に、雷 [t] を落とそう',
     done: '雷の通り道が、ガラスの脈になった',
     setup(e) {
-      const { cx, y0 } = stageFrame(e);
-      frame(e, cx, y0, 34);
-      fillRect(e, cx - 33, y0 - 2, cx + 33, y0 - 1, SAND);
-      mound(e, cx - 16, y0 - 2, 8,  SAND);
-      mound(e, cx + 2,  y0 - 2, 11, SAND);
-      mound(e, cx + 20, y0 - 2, 6,  SAND);
+      const { W, H } = stageFrame(e);
+      fillRect(e, 0, H - 3, W - 1, H - 1, SAND);
+      mound(e, Math.floor(W * 0.20), H - 3, Math.floor(H * 0.10), SAND);
+      mound(e, Math.floor(W * 0.45), H - 3, Math.floor(H * 0.16), SAND);
+      mound(e, Math.floor(W * 0.70), H - 3, Math.floor(H * 0.09), SAND);
+      mound(e, Math.floor(W * 0.88), H - 3, Math.floor(H * 0.12), SAND);
     },
   },
   {
     id: 'obsidian', title: '火口', goal: 8, products: [OBSIDIAN],
-    hint: '火口の溶岩に、氷 [o] を沈めよう',
+    hint: '火口に、雪 [3] を降らせよう',
     done: '火口は、漆黒の鏡石で蓋をされた',
     setup(e) {
-      const { cx, y0 } = stageFrame(e);
-      frame(e, cx, y0, 34);
-      mound(e, cx, y0 - 1, 22, STONE);                      // 石の山体（溶岩に溶けない）
-      fillRect(e, cx - 6, y0 - 22, cx + 6, y0 - 15, EMPTY); // 峰を大きくくり抜いてカルデラに
-      fillRect(e, cx - 6, y0 - 14, cx + 6, y0 - 12, LAVA);  // 有限の火口湖39セル（深さ3）
+      const { W, H, cx } = stageFrame(e);
+      // 台形の楯状火山。山頂に広く開けた溶岩湖を持つ
+      // - 深い縦穴にしないのは、融け水が溜まって氷の栓ができ溶岩が密封されるため
+      // - 縁の石は溶岩面と同じ高さ: 融け水は溜まらず山腹へ流れ落ちる
+      const baseHW = Math.floor(W * 0.30);               // 山裾の半幅
+      const topHW  = Math.max(14, Math.floor(W * 0.09)); // 山頂の半幅
+      const vh     = Math.max(20, Math.floor(H * 0.28)); // 山の高さ
+      fillRect(e, 0, H - 2, W - 1, H - 1, STONE);
+      for (let dy = 0; dy < vh; dy++) {
+        const hw = Math.round(baseHW + (topHW - baseHW) * (dy / (vh - 1)));
+        for (let x = cx - hw; x <= cx + hw; x++) set(e, x, H - 2 - dy, STONE);
+      }
+      const lakeTop = H - 1 - vh; // 山頂の行 = 溶岩面
+      fillRect(e, cx - (topHW - 2), lakeTop, cx + (topHW - 2), lakeTop + 2, LAVA);
       // 源泉は置かない: 溶岩が無限だと、できた黒曜石が下から再溶融して定着しないため
-      // 深い湖なのは、氷を「沈める」と4面が同時に急冷されて黒曜石の収率が上がるため
     },
   },
   {
@@ -142,12 +138,13 @@ export const DRILLS = [
     hint: '泥の田に、溶岩 [6] を注ごう',
     done: '泥は焼き締まり、玄武岩になった',
     setup(e) {
-      const { cx, y0 } = stageFrame(e);
-      frame(e, cx, y0, 34, 3);
-      fillRect(e, cx - 33, y0 - 3, cx + 33, y0 - 1, SOIL);
-      fillRect(e, cx - 16, y0 - 3, cx + 16, y0 - 1, MUD);
-      fillRect(e, cx - 6, y0 - 3, cx - 5, y0 - 1, SOIL); // 畦（あぜ）
-      fillRect(e, cx + 5, y0 - 3, cx + 6, y0 - 1, SOIL);
+      const { W, H } = stageFrame(e);
+      fillRect(e, 0, H - 4, W - 1, H - 1, SOIL);
+      // 2枚の泥田と畦（あぜ）
+      fillRect(e, Math.floor(W * 0.12), H - 4, Math.floor(W * 0.44), H - 2, MUD);
+      fillRect(e, Math.floor(W * 0.56), H - 4, Math.floor(W * 0.88), H - 2, MUD);
+      fillRect(e, Math.floor(W * 0.27), H - 4, Math.floor(W * 0.28), H - 2, SOIL);
+      fillRect(e, Math.floor(W * 0.71), H - 4, Math.floor(W * 0.72), H - 2, SOIL);
     },
   },
   {
@@ -155,24 +152,26 @@ export const DRILLS = [
     hint: '畝に、種 [w] を蒔こう',
     done: '畑に、緑が目を覚ます',
     setup(e) {
-      const { cx, y0 } = stageFrame(e);
-      frame(e, cx, y0, 34);
-      fillRect(e, cx - 33, y0 - 3, cx + 33, y0 - 1, SOIL);
-      for (let x = cx - 28; x <= cx + 8; x += 6) mound(e, x, y0 - 4, 2, SOIL); // 畝
-      vLine(e, cx + 14, y0 - 4, y0 - 1, STONE);           // 石張りの水瓶
-      vLine(e, cx + 24, y0 - 4, y0 - 1, STONE);
-      fillRect(e, cx + 15, y0 - 3, cx + 23, y0 - 1, WATER);
+      const { W, H } = stageFrame(e);
+      fillRect(e, 0, H - 4, W - 1, H - 1, SOIL);
+      for (let x = 8; x <= Math.floor(W * 0.68); x += 8) mound(e, x, H - 5, 2, SOIL); // 畝
+      const pL = Math.floor(W * 0.76), pR = Math.floor(W * 0.92);
+      fillRect(e, pL, H - 6, pL, H - 1, STONE);   // 石張りの水瓶
+      fillRect(e, pR, H - 6, pR, H - 1, STONE);
+      fillRect(e, pL + 1, H - 5, pR - 1, H - 2, WATER);
     },
   },
   {
     id: 'freeze', title: '凍る池', goal: 10, products: [ICE],
-    hint: '池に雪 [3] を降らせるか、氷 [o] を沈めよう',
+    hint: '池に、雪 [3] を降らせよう',
     done: '池は、静かに凍りついた',
     setup(e) {
-      const { cx, y0 } = stageFrame(e);
-      frame(e, cx, y0, 34);
-      rockyBanks(e, cx, y0, 34, 16, 4);
-      fillRect(e, cx - 15, y0 - 3, cx + 15, y0 - 1, WATER);
+      const { W, H, cx } = stageFrame(e);
+      const pw = Math.floor(W * 0.25);
+      fillRect(e, 0, H - 4, W - 1, H - 1, STONE);      // 地表は水面と同じ高さ（蓋にしない）
+      mound(e, Math.floor(W * 0.10), H - 5, 4, STONE);
+      mound(e, Math.floor(W * 0.90), H - 5, 5, STONE);
+      fillRect(e, cx - pw, H - 4, cx + pw, H - 2, WATER);
     },
   },
   {
@@ -180,12 +179,12 @@ export const DRILLS = [
     hint: '水面に、雷 [t] を落とそう',
     done: '水は一瞬、光の網になる',
     setup(e) {
-      const { cx, y0 } = stageFrame(e);
-      frame(e, cx, y0, 34);
-      rockyBanks(e, cx, y0, 34, 21, 3);
-      fillRect(e, cx - 20, y0 - 3, cx + 20, y0 - 1, WATER);
-      fillRect(e, cx - 9, y0 - 4, cx - 7, y0 - 1, STONE); // 水面から顔を出す岩
-      fillRect(e, cx + 6, y0 - 4, cx + 8, y0 - 1, STONE);
+      const { W, H } = stageFrame(e);
+      fillRect(e, 0, H - 4, W - 1, H - 1, STONE);      // 地表は水面と同じ高さ（蓋にしない）
+      fillRect(e, Math.floor(W * 0.10), H - 4, Math.floor(W * 0.90), H - 2, WATER);
+      // 水面から顔を出す岩の小島
+      fillRect(e, Math.floor(W * 0.34), H - 5, Math.floor(W * 0.36), H - 2, STONE);
+      fillRect(e, Math.floor(W * 0.62), H - 5, Math.floor(W * 0.63), H - 2, STONE);
     },
   },
   {
@@ -193,19 +192,26 @@ export const DRILLS = [
     hint: '石碑の割れ目に、金 [n] を注ごう',
     done: '割れ目は、金の景色になった',
     setup(e) {
-      const { cx, y0 } = stageFrame(e);
-      frame(e, cx, y0, 34);
-      fillRect(e, cx - 33, y0 - 2, cx + 33, y0 - 1, SAND);   // 砂庭
-      fillRect(e, cx - 12, y0 - 4, cx + 12, y0 - 3, BASALT); // 台座
-      fillRect(e, cx - 8, y0 - 13, cx + 8, y0 - 5, STONE);   // 石碑
-      // 稲妻形の割れ目（幅2）を上から下へ刻む
-      const wander = [0, 1, 2, 2, 1, 0, -1, -1, 0];
-      wander.forEach((dx, i) => {
-        set(e, cx + dx,     y0 - 13 + i, EMPTY);
-        set(e, cx + dx + 1, y0 - 13 + i, EMPTY);
-      });
-      set(e, cx - 1, y0 - 13, EMPTY); // 注ぎ口を少し広げる
-      set(e, cx + 2, y0 - 13, EMPTY);
+      const { W, H, cx } = stageFrame(e);
+      const mh  = Math.max(14, Math.floor(H * 0.10)); // 石碑の高さ（画面に応じて拡大）
+      const mw  = Math.floor(mh * 0.8);               // 石碑の半幅
+      const top = H - 5 - mh;                         // 石碑の天面の行
+      fillRect(e, 0, H - 3, W - 1, H - 1, SAND);                  // 砂庭
+      fillRect(e, cx - mw - 5, H - 5, cx + mw + 5, H - 4, BASALT); // 台座
+      fillRect(e, cx - mw, top, cx + mw, H - 6, STONE);            // 石碑
+      // 稲妻形の割れ目（幅2）を上から下へ刻む（ランダムウォーク、半幅の半分まで振れる）
+      let dx = 0;
+      const swing = Math.max(2, Math.floor(mw * 0.5));
+      for (let i = 0; i < mh - 1; i++) {
+        set(e, cx + dx,     top + i, EMPTY);
+        set(e, cx + dx + 1, top + i, EMPTY);
+        if (Math.random() < 0.5) {
+          dx += Math.random() < 0.5 ? 1 : -1;
+          dx = Math.max(-swing, Math.min(swing, dx));
+        }
+      }
+      set(e, cx - 1, top, EMPTY); // 注ぎ口を少し広げる
+      set(e, cx + 2, top, EMPTY);
     },
   },
 ];

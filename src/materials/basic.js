@@ -46,8 +46,9 @@ export function updateWater(engine, x, y) {
       if (engine.get(x+dx, y+dy) === SAND) { engine.set(x+dx, y+dy, SOIL); break; }
     }
   }
-  // Water + Snow/Ice → ICE (slow freeze)
-  if (Math.random() > 0.997) {
+  // Water + Snow/Ice → ICE（凍結 1%/frame。0.3% だと雪を降らせても
+  // 凍る前に融けてしまい、「反応しているのに見えない」状態になる）
+  if (Math.random() > 0.99) {
     const nb4w = [[0,1],[1,0],[-1,0],[0,-1]];
     for (const [dx,dy] of nb4w) {
       const wn = engine.get(x+dx, y+dy);
@@ -60,7 +61,13 @@ export function updateSnow(engine, x, y) {
   if (Math.random() > 0.45) return;
   const below = engine.get(x, y + 1);
   if (below === EMPTY) { engine.swap(x, y, x, y + 1); return; }
-  if (below === WATER || below === LAVA) { engine.set(x, y, WATER); return; }
+  if (below === LAVA) {
+    // 急冷: 雪が触れた溶岩は黒曜石に固まり、雪は融けて水になる（氷と同じ作法）
+    engine.set(x, y + 1, OBSIDIAN);
+    engine.set(x, y, WATER);
+    return;
+  }
+  if (below === WATER) { engine.set(x, y, WATER); return; }
   const dir = Math.random() > 0.5 ? 1 : -1;
   if (engine.get(x + dir, y + 1) === EMPTY) { engine.swap(x, y, x + dir, y + 1); return; }
   if (engine.get(x - dir, y + 1) === EMPTY) { engine.swap(x, y, x - dir, y + 1); return; }
