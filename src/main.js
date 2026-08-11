@@ -7,8 +7,9 @@ import { EMPTY, SAND, WATER, WALL, SNOW, FIRE, OIL, LAVA, COAL,
          ACID_PLANT, OBSIDIAN, SANDSTONE, BASALT, SPRING, LAVA_SPRING,
          SAKURA_SEED, SAKURA_PETAL, FIREFLY, POLLEN, MA_VOID, KOI, GOLD } from './materials.js';
 import { SCENARIOS, MATERIAL_TRIGGER_MAP } from './scenarios.js';
-import { ZenAudio }    from './audio.js';
-import { ChiriRitual } from './ritual.js';
+import { ZenAudio }     from './audio.js';
+import { ChiriRitual }  from './ritual.js';
+import { PracticeMode } from './practice.js';
 
 const CELL_SIZE = 4;
 
@@ -168,6 +169,7 @@ function init() {
   }
 
   function loadScenario(scenario) {
+    practice.stop(); // 実験帳とシナリオは排他
     activeScenario = scenario;
     currentAct     = 0;
     input.resetUsage();
@@ -199,6 +201,22 @@ function init() {
       updateScenarioBar();
     }
   }
+
+  // ── 実験帳（化学反応の練習モード）────────────────────────────────────────
+  const practice = new PracticeMode(engine, {
+    onBar: text => {
+      if (text === null) {
+        if (!activeScenario) scenarioBar.classList.remove('show');
+        return;
+      }
+      scenarioBar.textContent = text;
+      scenarioBar.classList.add('show');
+    },
+    onSuccess: () => audio.bell(),
+    onFinish:  () => setTimeout(() => {
+      if (!practice.active && !activeScenario) scenarioBar.classList.remove('show');
+    }, 4000),
+  });
 
   // ── Scenario modal ────────────────────────────────────────────────────────
   function openModal() {
@@ -292,6 +310,19 @@ function init() {
     input.brushRadius = Number(brushSlider.value);
   });
 
+  // ── UI: 実験帳 ───────────────────────────────────────────────────────────
+  const practiceBtn = document.getElementById('practice-btn');
+  practiceBtn.addEventListener('click', () => {
+    audio.ensure();
+    if (!practice.active) {
+      activeScenario = null;
+      practice.start();
+      showHint('実験帳 — 🧪でスキップ、クリアで退出');
+    } else {
+      practice.skip();
+    }
+  });
+
   // ── UI: rain toggle ───────────────────────────────────────────────────────
   const rainBtn = document.getElementById('rain-btn');
   rainBtn.addEventListener('click', () => {
@@ -321,6 +352,7 @@ function init() {
 
   // ── UI: clear ────────────────────────────────────────────────────────────
   document.getElementById('clear-btn').addEventListener('click', () => {
+    practice.stop();
     engine.clear();
     activeScenario = null;
     updateScenarioBar();
@@ -338,6 +370,7 @@ function init() {
       audio.bell();
       showHint('無');
     }
+    practice.step();
     // 水の在否を毎秒まばらに標本調査（環境音の雫用）
     if (++frame % 60 === 0) {
       waterPresent = false;

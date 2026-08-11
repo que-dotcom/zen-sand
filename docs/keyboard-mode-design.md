@@ -66,7 +66,7 @@
 │  ▔▔▔▔                                              │
 │  ●砂    ●水    ●雪    ●壁                          │ ← 行1: 選択中グループの素材（最大6）
 ├────────────────────────────────────────────────────┤
-│  ブラシ ⊖ ③ ⊕    🎬  ☁  🔔  🍃    クリア           │ ← 行2: 操作
+│  ブラシ ⊖ ③ ⊕    🎬  🧪  ☁  🔔  🍃    クリア       │ ← 行2: 操作
 └────────────────────────────────────────────────────┘
 ```
 
@@ -84,6 +84,7 @@
     <span id="brush-val">3</span>
     <button id="brush-inc" class="ctl-btn">⊕</button>
     <button id="scenario-btn" class="ctl-btn">🎬</button>
+    <button id="practice-btn" class="ctl-btn">🧪</button>
     <button id="rain-btn"     class="ctl-btn">☁</button>
     <button id="sound-btn"    class="ctl-btn">🔔</button>
     <button id="chiri-btn"    class="ctl-btn">🍃</button>
@@ -213,7 +214,7 @@ OSのキーリピートは初回遅延が約500msあり、加速カーブが作�
 | 素材 ← / → | 選択中グループ内で素材を送る・戻す |
 | グループ ← / → | グループを送る・戻す |
 
-メニューキーは操作行（雨・音・散・クリア）専用として残る。
+メニューキーは操作行（実験・雨・音・散・クリア）専用として残る。
 
 ### 構成C — 18キー（快適）
 
