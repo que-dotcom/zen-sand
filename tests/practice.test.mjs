@@ -13,7 +13,7 @@ import { Engine } from '../src/engine.js';
 import { PracticeMode, DRILLS, stageFrame, stripRuby } from '../src/practice.js';
 import * as ids from '../src/materials/ids.js';
 
-const { EMPTY, FIRE, WATER, LIGHTNING, LAVA, OIL, SEED, GOLD, SNOW, METAL, ACID, MUD, POLLEN, SAKURA_SEED } = ids;
+const { EMPTY, FIRE, WATER, LIGHTNING, LAVA, OIL, SEED, GOLD, SNOW, METAL, ACID, MUD, SAKURA_SEED } = ids;
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'out');
 mkdirSync(OUT, { recursive: true });
@@ -98,7 +98,6 @@ const ANSWERS = {
   'glass-kiln': f => { if (f % 2 === 0) engine.set(24 + ((f * 5) % 152), H - 30, LAVA); },
   charcoal: f => { if (f % 3 === 0)  engine.set(24 + ((f * 7) % 152), H - 18, FIRE); },
   'mud-snow': f => { if (f % 2 === 0) engine.set(20 + ((f * 7) % 160), H - 20, MUD); },
-  'pollen-wind': f => { if (f % 2 === 0) engine.set(20 + ((f * 7) % 160), H - 16, POLLEN); },
   'sakura-hill': f => { if (f % 3 === 0) engine.set(22 + ((f * 7) % 156), H - 22, SAKURA_SEED); },
   'thunder-shroom': f => { if (f % 18 === 0) engine.set(20 + (((f / 18) % 20) | 0) * 8, H - 3, LIGHTNING); },
   'rust-sea': f => { if (f % 3 === 0) engine.set(20 + ((f * 7) % 160), H - 32, METAL); },
@@ -225,6 +224,23 @@ check('900フレーム未満では詰まり支援を出さない', stuckLog.leng
 stuckPractice.step();
 check('900フレーム無反応で詰まり支援を出す',
   stuckLog.length === 1 && stuckLog[0] === DRILLS[0].id);
+
+// 無入力で勝手に成功する題がないこと（舞台の自然変化が増分判定へ漏れ込む事故の検出。
+// 2026-08-12 の「花の風」= 草の自然開花で開幕即成功、を再発させないための恒久ガード）
+const selfSucceeded = [];
+for (let i = 0; i < DRILLS.length; i++) {
+  const idleEngine = new Engine(200, 140);
+  const idlePractice = new PracticeMode(idleEngine, {});
+  idlePractice.start();
+  while (idlePractice.index < i) idlePractice.skip();
+  for (let frame = 0; frame < 600; frame++) {
+    idleEngine.update();
+    idlePractice.step();
+    if (idlePractice.state !== 'trying') { selfSucceeded.push(DRILLS[i].id); break; }
+  }
+}
+if (selfSucceeded.length) console.log('  自己成功:', selfSucceeded.join(', '));
+check('無入力600フレームで自己成功する題がない', selfSucceeded.length === 0);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -2,7 +2,7 @@ import {
   EMPTY, STONE, SAND, WATER, LAVA, OIL, COAL, SOIL, MUD, GLASS,
   OBSIDIAN, SANDSTONE, BASALT, STEAM, FIRE, PLANT, DARK_PLANT, FLOWER, SPARK, KINTSUGI,
   FUNGUS, GLOW_FUNGUS, ICE, LAVA_SPRING, HARD_SOIL, METAL, RUST, FIREFLY,
-  LIGHTNING, SEED, SNOW, GOLD, ASH, ACID, POLLEN, SAKURA_SEED, SAKURA_TREE,
+  LIGHTNING, SEED, SNOW, GOLD, ASH, ACID, SAKURA_SEED, SAKURA_TREE,
 } from './materials.js';
 
 export function stripRuby(s) {
@@ -48,7 +48,7 @@ export function stageFrame(engine) {
   };
 }
 
-// ─── お題25題 ────────────────────────────────────────────────────────────────
+// ─── お題24題 ────────────────────────────────────────────────────────────────
 // products: 数える生成物 / goal: 成功に必要な増分（ベースライン比）
 
 export const DRILLS = [
@@ -377,21 +377,9 @@ export const DRILLS = [
       mound(e, Math.floor(W * 0.72), H - 4, Math.max(9, Math.floor(H * 0.07)), SNOW);
     },
   },
-  {
-    id: 'pollen-wind', title: '花の風', goal: 3, products: [FLOWER], place: [POLLEN],
-    hint: '草原{そうげん}に、花粉{かふん} [z] を とばしてみよう',
-    react: '花粉{かふん}が ついて 花{はな}が さいた！',
-    learn: '花粉{かふん}は 風{かぜ}に のって 飛{と}んでいき、草{くさ}や 木{き}に 花{はな}を さかせる 手伝{てつだ}いを するよ。ミツバチが 花粉{かふん}を はこぶのも 同{おな}じ 理由{りゆう}だね。',
-    done: '草原{そうげん} いちめんに、花{はな}が さいた',
-    setup(e) {
-      const { W, H } = stageFrame(e);
-      fillRect(e, 0, H - 3, W - 1, H - 1, SOIL);
-      for (let x = 5; x < W - 5; x += 3) {
-        const h = 5 + (x % 7);
-        for (let y = H - 4; y >= H - 4 - h; y--) set(e, x, y, PLANT);
-      }
-    },
-  },
+  // 「花の風」（草原に花粉→開花）は 2026-08-12 の検収で差し戻し。
+  // 舞台の草が自然開花し続け（無入力で20秒かけて340輪）、増分判定では
+  // 花粉の効果（+19輪）と区別できない。§8 の予告どおり遺伝子色の判定機構が先。
   {
     id: 'sakura-hill', title: 'さくらの丘', goal: 3, products: [SAKURA_TREE], place: [SAKURA_SEED],
     hint: '丘{おか}に、桜{さくら}の 種{たね} [j] を まいてみよう',
