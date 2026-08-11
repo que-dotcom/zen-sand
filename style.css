@@ -12,6 +12,11 @@ body {
   -webkit-user-select: none;
 }
 
+rt {
+  font-size: 0.5em;
+  letter-spacing: 0.04em;
+}
+
 #canvas {
   display: block;
   height: auto;
@@ -79,6 +84,18 @@ body {
 .tab-btn.active {
   color: #fff;
   border-bottom-color: rgba(255, 255, 255, 0.75);
+}
+
+.tab-btn.suggest,
+.mat-btn.suggest {
+  border-color: rgba(255, 211, 100, 0.95);
+  box-shadow: 0 0 8px rgba(255, 194, 58, 0.68);
+  animation: suggest-pulse 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes suggest-pulse {
+  from { box-shadow: 0 0 5px rgba(255, 194, 58, 0.35); }
+  to { box-shadow: 0 0 14px rgba(255, 211, 100, 0.95); }
 }
 
 /* ─── 行1: 素材 ─────────────────────────────────────────────────────────── */

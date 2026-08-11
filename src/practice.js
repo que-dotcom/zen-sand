@@ -2,7 +2,12 @@ import {
   EMPTY, STONE, SAND, WATER, LAVA, OIL, COAL, SOIL, MUD, GLASS,
   OBSIDIAN, SANDSTONE, BASALT, STEAM, FIRE, PLANT, DARK_PLANT, FLOWER, SPARK, KINTSUGI,
   FUNGUS, GLOW_FUNGUS, ICE, LAVA_SPRING, HARD_SOIL, METAL, RUST, FIREFLY,
+  LIGHTNING, SEED, SNOW, GOLD,
 } from './materials.js';
+
+export function stripRuby(s) {
+  return s.replace(/([一-龠々〆〤ヶ]+)\{([^}]+)\}/g, '$1');
+}
 
 // ─── 実験帳 (Practice Mode) ──────────────────────────────────────────────────
 //
@@ -48,10 +53,10 @@ export function stageFrame(engine) {
 
 export const DRILLS = [
   {
-    id: 'wildfire', title: '野火', goal: 12, products: [FIRE],
-    hint: 'かわいた くさはらに、ひ [4] を はなってみよう',
-    react: 'ひが くさに もえうつったよ！',
-    learn: 'かわいた くさに ひが つくと、もえて どんどん ひろがるよ。もえた あとには、しろい はいが のこるんだ。',
+    id: 'wildfire', title: '野火', goal: 12, products: [FIRE], place: [FIRE],
+    hint: '乾{かわ}いた 草原{そうげん}に、火{ひ} [4] を 放{はな}ってみよう',
+    react: '火{ひ}が 草{くさ}に 燃{も}えうつったよ！',
+    learn: '乾{かわ}いた 草{くさ}に 火{ひ}が つくと、燃{も}えて どんどん 広{ひろ}がるよ。燃{も}えた あとには、白{しろ}い 灰{はい}が のこるんだ。',
     done: '炎は草を走り、あとに灰が残る',
     setup(e) {
       const { W, H } = stageFrame(e);
@@ -65,10 +70,10 @@ export const DRILLS = [
     },
   },
   {
-    id: 'oilfield', title: '油田の雷鳴', goal: 30, products: [FIRE],
-    hint: 'くろい あぶらの うみに、かみなり [t] を おとしてみよう',
-    react: 'かみなりで あぶらに ひが ついた！',
-    learn: 'あぶらは とても もえやすい えきたい。かみなりの ひばなが つくと、いっきに ほのおの うみに なるよ。',
+    id: 'oilfield', title: '油田の雷鳴', goal: 30, products: [FIRE], place: [LIGHTNING],
+    hint: '黒{くろ}い 油{あぶら}の 海{うみ}に、雷{かみなり} [t] を 落{お}としてみよう',
+    react: '雷{かみなり}で 油{あぶら}に 火{ひ}が ついた！',
+    learn: '油{あぶら}は とても 燃{も}えやすい 液体{えきたい}。雷{かみなり}の 火花{ひばな}が つくと、いっきに 炎{ほのお}の 海{うみ}に なるよ。',
     done: '稲妻は油田を、炎の海へ変えた',
     setup(e) {
       const { W, H } = stageFrame(e);
@@ -83,10 +88,10 @@ export const DRILLS = [
     },
   },
   {
-    id: 'steam', title: '湯けむり', goal: 10, products: [STEAM],
-    hint: 'いわの あいだの いずみに、ひ [4] か ようがん [6] を いれてみよう',
-    react: 'みずが あたたまって ゆげが でてきた！',
-    learn: 'みずは あつくなると「じょうき（ゆげ）」に なって、そらへ のぼっていくよ。おんせんの ゆけむりと おなじだね。',
+    id: 'steam', title: '湯けむり', goal: 10, products: [STEAM], place: [FIRE, LAVA],
+    hint: '岩{いわ}の 間{あいだ}の 泉{いずみ}に、火{ひ} [4] か 溶岩{ようがん} [6] を 入{い}れてみよう',
+    react: '水{みず}が 温{あたた}まって 湯気{ゆげ}が 出{で}てきた！',
+    learn: '水{みず}は 熱{あつ}くなると「蒸気{じょうき}（湯気{ゆげ}）」に なって、空{そら}へ のぼっていくよ。温泉{おんせん}の 湯{ゆ}けむりと 同{おな}じだね。',
     done: '湯けむりが立ちのぼる',
     setup(e) {
       const { W, H, cx } = stageFrame(e);
@@ -98,10 +103,10 @@ export const DRILLS = [
     },
   },
   {
-    id: 'stone', title: '溶岩流', goal: 10, products: [STONE],
-    hint: 'やまを ながれる ようがんに、みず [2] を かけてみよう',
-    react: 'ようがんが みずで ひやされて いしに なった！',
-    learn: 'あつあつの ようがんは、みずに ふれると いっきに ひやされて、かたい いしに かわるよ。',
+    id: 'stone', title: '溶岩流', goal: 10, products: [STONE], place: [WATER],
+    hint: '山{やま}を 流{なが}れる 溶岩{ようがん}に、水{みず} [2] を かけてみよう',
+    react: '溶岩{ようがん}が 水{みず}で 冷{ひ}やされて 石{いし}に なった！',
+    learn: 'あつあつの 溶岩{ようがん}は、水{みず}に ふれると いっきに 冷{ひ}やされて、硬{かた}い 石{いし}に かわるよ。',
     done: '流れは、岩の段になって止まった',
     setup(e) {
       const { W, H } = stageFrame(e);
@@ -123,10 +128,10 @@ export const DRILLS = [
     },
   },
   {
-    id: 'glass', title: '雷とガラス', goal: 8, products: [GLASS],
-    hint: 'すなやまに、かみなり [t] を おとしてみよう',
-    react: 'かみなりが すなを ガラスに かえた！',
-    learn: 'かみなりは ものすごく あつい。すなが とけて ひえると、とうめいな ガラスに なるんだ。ほんものの さばくでも おきることだよ。',
+    id: 'glass', title: '雷とガラス', goal: 8, products: [GLASS], place: [LIGHTNING],
+    hint: '砂山{すなやま}に、雷{かみなり} [t] を 落{お}としてみよう',
+    react: '雷{かみなり}が 砂{すな}を ガラスに 変{か}えた！',
+    learn: '雷{かみなり}は ものすごく 熱{あつ}い。砂{すな}が 溶{と}けて 冷{ひ}えると、透明{とうめい}な ガラスに なるんだ。本物{ほんもの}の 砂漠{さばく}でも 起{お}きることだよ。',
     done: '雷の通り道が、ガラスの脈になった',
     setup(e) {
       const { W, H } = stageFrame(e);
@@ -138,10 +143,10 @@ export const DRILLS = [
     },
   },
   {
-    id: 'sandstone', title: '砂の炉', goal: 10, products: [SANDSTONE],
-    hint: 'すなやまの うえから、ようがん [6] を ながしてみよう',
-    react: 'すなが やきかたまって いわに なってきた！',
-    learn: 'すなは ようがんの ねつで やきかたまると、「さがん」という いわに なるよ。',
+    id: 'sandstone', title: '砂の炉', goal: 10, products: [SANDSTONE], place: [LAVA],
+    hint: '砂山{すなやま}の 上{うえ}から、溶岩{ようがん} [6] を 流{なが}してみよう',
+    react: '砂{すな}が 焼{や}きかたまって 岩{いわ}に なってきた！',
+    learn: '砂{すな}は 溶岩{ようがん}の 熱{ねつ}で 焼{や}きかたまると、「砂岩{さがん}」という 岩{いわ}に なるよ。',
     done: '砂は焼き締まり、金色の岩肌になった',
     setup(e) {
       const { W, H } = stageFrame(e);
@@ -154,10 +159,10 @@ export const DRILLS = [
     },
   },
   {
-    id: 'obsidian', title: '火口', goal: 8, products: [OBSIDIAN],
-    hint: 'かこうに、ゆき [3] を ふらせてみよう',
-    react: 'ゆきで ひやされて くろい いしが できた！',
-    learn: 'ようがんが きゅうに ひやされると、くろくて ぴかぴかの「こくようせき」に なるよ。おおむかしの ひとは、これで やじりを つくったんだ。',
+    id: 'obsidian', title: '火口', goal: 8, products: [OBSIDIAN], place: [SNOW],
+    hint: '火口{かこう}に、雪{ゆき} [3] を 降{ふ}らせてみよう',
+    react: '雪{ゆき}で 冷{ひ}やされて 黒{くろ}い 石{いし}が できた！',
+    learn: '溶岩{ようがん}が 急{きゅう}に 冷{ひ}やされると、黒{くろ}くて ぴかぴかの「黒曜石{こくようせき}」に なるよ。大昔{おおむかし}の 人{ひと}は、これで 矢尻{やじり}を 作{つく}ったんだ。',
     done: '火口は、漆黒の鏡石で蓋をされた',
     setup(e) {
       const { W, H, cx } = stageFrame(e);
@@ -178,10 +183,10 @@ export const DRILLS = [
     },
   },
   {
-    id: 'basalt', title: '泥田', goal: 8, products: [BASALT],
-    hint: 'どろの たんぼに、ようがん [6] を そそいでみよう',
-    react: 'どろが やけて かたい いわに なった！',
-    learn: 'どろは ようがんの ねつで やきしまると、「げんぶがん」という くろい いわに なるよ。',
+    id: 'basalt', title: '泥田', goal: 8, products: [BASALT], place: [LAVA],
+    hint: '泥{どろ}の 田{た}んぼに、溶岩{ようがん} [6] を 注{そそ}いでみよう',
+    react: '泥{どろ}が 焼{や}けて 硬{かた}い 岩{いわ}に なった！',
+    learn: '泥{どろ}は 溶岩{ようがん}の 熱{ねつ}で 焼{や}きしまると、「玄武岩{げんぶがん}」という 黒{くろ}い 岩{いわ}に なるよ。',
     done: '泥は焼き締まり、玄武岩になった',
     setup(e) {
       const { W, H } = stageFrame(e);
@@ -194,10 +199,10 @@ export const DRILLS = [
     },
   },
   {
-    id: 'glow-cave', title: '夜光洞', goal: 12, products: [GLOW_FUNGUS],
-    hint: 'ほらあなの きのこに、あぶら [5] を そそいでみよう',
-    react: 'きのこが ひかりはじめた！',
-    learn: 'この きのこは あぶらを すいこむと、あおみどりに ひかる「ひかりきのこ」に かわるよ。くらい ほらあなの あかりに なるね。',
+    id: 'glow-cave', title: '夜光洞', goal: 12, products: [GLOW_FUNGUS], place: [OIL],
+    hint: '洞穴{ほらあな}の きのこに、油{あぶら} [5] を 注{そそ}いでみよう',
+    react: 'きのこが 光{ひか}りはじめた！',
+    learn: 'この きのこは 油{あぶら}を 吸{す}いこむと、青緑{あおみどり}に 光{ひか}る「光{ひかり}きのこ」に かわるよ。暗{くら}い 洞穴{ほらあな}の 明{あか}りに なるね。',
     done: '菌床は青緑の灯りを宿した',
     setup(e) {
       const { W, H } = stageFrame(e);
@@ -218,10 +223,10 @@ export const DRILLS = [
     },
   },
   {
-    id: 'sprout', title: '畑', goal: 3, products: [PLANT, FLOWER],
-    hint: 'はたけの うねに、たね [w] を まいてみよう',
-    react: 'たねから めが でたよ！',
-    learn: 'たねは、つちと みずが そろうと めを だすよ。そだつと、やがて はなも さくんだ。',
+    id: 'sprout', title: '畑', goal: 3, products: [PLANT, FLOWER], place: [SEED],
+    hint: '畑{はたけ}の 畝{うね}に、種{たね} [w] を まいてみよう',
+    react: '種{たね}から 芽{め}が 出{で}たよ！',
+    learn: '種{たね}は、土{つち}と 水{みず}が そろうと 芽{め}を 出{だ}すよ。育{そだ}つと、やがて 花{はな}も 咲{さ}くんだ。',
     done: '畑に、緑が目を覚ます',
     setup(e) {
       const { W, H } = stageFrame(e);
@@ -234,12 +239,12 @@ export const DRILLS = [
     },
   },
   {
-    id: 'sumi-night', title: '墨田の夜', goal: 8, products: [DARK_PLANT],
-    hint: '① がめんの したの くろい すみばたけに、みず [2] を ながしてみよう',
-    react: 'すみの どろから くろい くさが はえた！',
-    learn: 'すみと みずが まざると、くろい どろに なる。その どろから そだった くさは、よるの いろに なるんだ。',
+    id: 'sumi-night', title: '墨田の夜', goal: 8, products: [DARK_PLANT], place: [WATER],
+    hint: '① 画面{がめん}の 下{した}の 黒{くろ}い 墨畑{すみばたけ}に、水{みず} [2] を 流{なが}してみよう',
+    react: '墨{すみ}の 泥{どろ}から 黒{くろ}い 草{くさ}が 生{は}えた！',
+    learn: '墨{すみ}と 水{みず}が 混{ま}ざると、黒{くろ}い 泥{どろ}に なる。その 泥{どろ}から 育{そだ}った 草{くさ}は、夜{よる}の 色{いろ}に なるんだ。',
     instructions: [
-      { products: [MUD], goal: 10, hint: '② できた くろい どろの うえに、たね [w] を まいてみよう' },
+      { products: [MUD], goal: 10, hint: '② できた 黒{くろ}い 泥{どろ}の 上{うえ}に、種{たね} [w] を まいてみよう', place: [SEED] },
     ],
     done: '墨の泥から、夜色の草が伸びた',
     setup(e) {
@@ -258,10 +263,10 @@ export const DRILLS = [
     },
   },
   {
-    id: 'freeze', title: '凍る池', goal: 10, products: [ICE],
-    hint: 'いけに、ゆき [3] を ふらせてみよう',
-    react: 'いけが こおりはじめた！',
-    learn: 'みずは ゆきで ひやされると、こおって「こおり」に なるよ。さむい ふゆの いけと おなじだね。',
+    id: 'freeze', title: '凍る池', goal: 10, products: [ICE], place: [SNOW],
+    hint: '池{いけ}に、雪{ゆき} [3] を 降{ふ}らせてみよう',
+    react: '池{いけ}が 凍{こお}りはじめた！',
+    learn: '水{みず}は 雪{ゆき}で 冷{ひ}やされると、凍{こお}って「氷{こおり}」に なるよ。寒{さむ}い 冬{ふゆ}の 池{いけ}と 同{おな}じだね。',
     done: '池は、静かに凍りついた',
     setup(e) {
       const { W, H, cx } = stageFrame(e);
@@ -273,10 +278,10 @@ export const DRILLS = [
     },
   },
   {
-    id: 'spark', title: '雷鳴の池', goal: 8, products: [SPARK],
-    hint: 'いけの みずめんに、かみなり [t] を おとしてみよう',
-    react: 'でんきが みずの なかを はしった！',
-    learn: 'みずは でんきを とおすよ。だから かみなりが おちると、いけ ぜんたいに でんきが ひろがるんだ。ほんものの かみなりの ひは、プールや いけに はいっちゃ だめだよ。',
+    id: 'spark', title: '雷鳴の池', goal: 8, products: [SPARK], place: [LIGHTNING],
+    hint: '池{いけ}の 水面{みなも}に、雷{かみなり} [t] を 落{お}としてみよう',
+    react: '電気{でんき}が 水{みず}の 中{なか}を 走{はし}った！',
+    learn: '水{みず}は 電気{でんき}を 通{とお}すよ。だから 雷{かみなり}が 落{お}ちると、池{いけ} 全体{ぜんたい}に 電気{でんき}が 広{ひろ}がるんだ。本物{ほんもの}の 雷{かみなり}の 日{ひ}は、プールや 池{いけ}に 入{はい}っちゃ だめだよ。',
     done: '水は一瞬、光の網になる',
     setup(e) {
       const { W, H } = stageFrame(e);
@@ -288,10 +293,10 @@ export const DRILLS = [
     },
   },
   {
-    id: 'rust-sea', title: '錆の海', goal: 8, products: [RUST],
-    hint: 'うみに、きんぞく [r] を しずめてみよう',
-    react: 'きんぞくが さびて あかくなってきた！',
-    learn: 'てつは みずに ぬれると、すこしずつ あかい「さび」に かわるよ。じてんしゃを あめざらしに すると さびるのと おなじだね。',
+    id: 'rust-sea', title: '錆の海', goal: 8, products: [RUST], place: [METAL],
+    hint: '海{うみ}に、金属{きんぞく} [r] を 沈{しず}めてみよう',
+    react: '金属{きんぞく}が 錆{さ}びて 赤{あか}くなってきた！',
+    learn: '鉄{てつ}は 水{みず}に 濡{ぬ}れると、少{すこ}しずつ 赤{あか}い「錆{さび}」に 変{か}わるよ。自転車{じてんしゃ}を 雨{あめ}ざらしに すると 錆{さ}びるのと 同{おな}じだね。',
     done: '波の底で、鉄は赤い砂になった',
     setup(e) {
       const { W, H } = stageFrame(e);
@@ -302,10 +307,10 @@ export const DRILLS = [
     },
   },
   {
-    id: 'firefly-brook', title: '蛍の沢', goal: 8, products: [FIREFLY],
-    hint: 'くさむらの さわに、みず [2] を そそいでみよう',
-    react: 'くさの あいだから ほたるが うまれた！',
-    learn: 'ほたるは、きれいな みずべの くさむらが だいすき。みずが あると あつまってきて、ぴかぴか ひかって とぶよ。',
+    id: 'firefly-brook', title: '蛍の沢', goal: 8, products: [FIREFLY], place: [WATER],
+    hint: '草{くさ}むらの 沢{さわ}に、水{みず} [2] を 注{そそ}いでみよう',
+    react: '草{くさ}の 間{あいだ}から 蛍{ほたる}が 生{う}まれた！',
+    learn: '蛍{ほたる}は、きれいな 水辺{みずべ}の 草{くさ}むらが 大好{だいす}き。水{みず}が あると 集{あつ}まってきて、ぴかぴか 光{ひか}って 飛{と}ぶよ。',
     done: '草のあいだに、淡い灯がともる',
     setup(e) {
       const { W, H } = stageFrame(e);
@@ -317,10 +322,10 @@ export const DRILLS = [
     },
   },
   {
-    id: 'kintsugi', title: '金継ぎ', goal: 3, products: [KINTSUGI],
-    hint: 'いしの われめに、きん [n] を そそいでみよう',
-    react: 'われめに きんが ながれこんで かたまった！',
-    learn: 'われた うつわを きんで つなぐ、「きんつぎ」という にほんの わざだよ。われめが たからものの もように かわるんだ。',
+    id: 'kintsugi', title: '金継ぎ', goal: 3, products: [KINTSUGI], place: [GOLD],
+    hint: '石{いし}の 割{わ}れ目{め}に、金{きん} [n] を 注{そそ}いでみよう',
+    react: '割{わ}れ目{め}に 金{きん}が 流{なが}れこんで 固{かた}まった！',
+    learn: '割{わ}れた 器{うつわ}を 金{きん}で つなぐ、「金継{きんつ}ぎ」という 日本{にほん}の 技{わざ}だよ。割{わ}れ目{め}が 宝物{たからもの}の 模様{もよう}に 変{か}わるんだ。',
     done: '割れ目は、金の景色になった',
     setup(e) {
       const { W, H, cx } = stageFrame(e);
@@ -350,7 +355,7 @@ export const DRILLS = [
 // ─── モード制御 ──────────────────────────────────────────────────────────────
 
 export class PracticeMode {
-  // hooks: { onBar(text|null), onState(state), onReact(text), onSuccess(), onCelebrate(replay), onFinish() }
+  // hooks: { onBar(text|null), onState(state), onGuide(ids|null), onStuck(drill), onReact(text), onSuccess(), onCelebrate(replay), onFinish() }
   // DOM や音の配線は呼び出し側が持つ。
   constructor(engine, hooks = {}) {
     this.engine   = engine;
@@ -368,6 +373,8 @@ export class PracticeMode {
     this.recordFrame = 0;
     this.celebrateFrames = null;
     this.celebrated = false;
+    this.stuckFrames = 0;
+    this.stuckCount = 0;
   }
 
   start() {
@@ -381,6 +388,7 @@ export class PracticeMode {
     this.state  = 'idle';
     this._discardReplay();
     this.hooks.onBar?.(null);
+    this.hooks.onGuide?.(null);
     this.hooks.onState?.('idle');
   }
 
@@ -399,22 +407,27 @@ export class PracticeMode {
     const d = DRILLS[this.index];
     const instruction = d.instructions?.[this.instructionIndex];
     if (instruction) {
+      this._stepStuck(d);
       const baseline = this.instructionBaselines[this.instructionIndex];
       if (this._count(instruction.products) - baseline >= instruction.goal) {
         this.instructionIndex++;
         this.hooks.onBar?.(`じっけん ${this.index + 1}/${DRILLS.length} 「${d.title}」 — ${instruction.hint}`);
+        this.hooks.onGuide?.(instruction.place ?? null);
       }
       return;
     }
     const productIncrease = this._count(d.products) - this.baseline;
     if (!this.reacted && productIncrease >= 1) {
       this.reacted = true;
+      this.hooks.onGuide?.(null); // 反応が始まったらボタンの誘導は役目を終える
       this.hooks.onReact?.(d.react);
     }
+    this._stepStuck(d);
     if (productIncrease >= d.goal) {
       this.state = 'ready';
       this.celebrateFrames = 0;
-      this.hooks.onBar?.(`⭕ できた！ 「${d.title}」 — 🧪の「つぎへ」で つぎの じっけんに すすめるよ`);
+      this.hooks.onGuide?.(null);
+      this.hooks.onBar?.(`⭕ できた！ 「${d.title}」 — 🧪の「つぎへ」で 次{つぎ}の じっけんに 進{すす}めるよ`);
       this.hooks.onState?.('ready');
       this.hooks.onSuccess?.();
     }
@@ -428,8 +441,11 @@ export class PracticeMode {
     this.instructionIndex = 0;
     this.instructionBaselines = (d.instructions ?? []).map(instruction => this._count(instruction.products));
     this.reacted = false;
+    this.stuckFrames = 0;
+    this.stuckCount = 0;
     this._discardReplay();
     this.state    = 'trying';
+    this.hooks.onGuide?.(d.place ?? null);
     this.hooks.onState?.('trying');
     this.hooks.onBar?.(`じっけん ${this.index + 1}/${DRILLS.length} 「${d.title}」 — ${d.hint}`);
   }
@@ -438,6 +454,12 @@ export class PracticeMode {
     this.index++;
     if (this.index >= DRILLS.length) return this._finish();
     this._load();
+  }
+
+  _stepStuck(drill) {
+    if (this.reacted || ++this.stuckFrames % 900 !== 0 || this.stuckCount >= 3) return;
+    this.stuckCount++;
+    this.hooks.onStuck?.(drill);
   }
 
   _recordReplay() {
@@ -476,8 +498,9 @@ export class PracticeMode {
     this.active = false;
     this.state = 'idle';
     this.index = DRILLS.length;
+    this.hooks.onGuide?.(null);
     this.hooks.onState?.('idle');
-    this.hooks.onBar?.('🎓 ぜんぶ クリア！ じっけんちょう、かんぺき！ こんどは じゆうに あそんでみよう');
+    this.hooks.onBar?.('🎓 ぜんぶ クリア！ じっけんちょう、かんぺき！ こんどは 自由{じゆう}に 遊{あそ}んでみよう');
     this.hooks.onFinish?.();
   }
 

@@ -10,7 +10,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { Engine } from '../src/engine.js';
-import { PracticeMode, DRILLS, stageFrame } from '../src/practice.js';
+import { PracticeMode, DRILLS, stageFrame, stripRuby } from '../src/practice.js';
 import * as ids from '../src/materials/ids.js';
 
 const { EMPTY, FIRE, WATER, LIGHTNING, LAVA, OIL, SEED, GOLD, SNOW, METAL } = ids;
@@ -176,6 +176,46 @@ check('次へ操作で次の実験へ進む', manualPractice.index === 1 && manu
 for (let f = 0; f < 120; f++) { manualEngine.update(); manualPractice.step(); }
 check('ready中に次へを押すとリプレイを出さない', skippedCelebrations === 0,
   `celebrations=${skippedCelebrations}`);
+
+check('ルビ表記を読み仮名なしの文字列へ変換する',
+  stripRuby('火{ひ}を重{かさ}ね') === '火を重ね');
+
+const guideLog = [];
+const guideEngine = new Engine(200, 140);
+const guidePractice = new PracticeMode(guideEngine, {
+  onGuide: ids => guideLog.push(ids),
+});
+guidePractice.start();
+check('開始時にお題の配置素材をガイドする',
+  guideLog.at(-1) === DRILLS[0].place);
+for (let x = 0; x < DRILLS[0].goal; x++) guideEngine.set(x, 20, FIRE);
+guidePractice.step();
+check('成功してreadyへ移るとガイドを解除する',
+  guidePractice.state === 'ready' && guideLog.at(-1) === null);
+
+const sumiGuideLog = [];
+const sumiGuideEngine = new Engine(200, 140);
+const sumiGuidePractice = new PracticeMode(sumiGuideEngine, {
+  onGuide: ids => sumiGuideLog.push(ids),
+});
+sumiGuidePractice.start();
+sumiGuidePractice.index = DRILLS.findIndex(drill => drill.id === 'sumi-night');
+sumiGuidePractice._load();
+for (let x = 0; x < 10; x++) sumiGuideEngine.set(x, 20, ids.MUD);
+sumiGuidePractice.step();
+check('途中の指示へ進むとその配置素材をガイドする',
+  sumiGuideLog.at(-1) === DRILLS[sumiGuidePractice.index].instructions[0].place);
+
+const stuckLog = [];
+const stuckPractice = new PracticeMode(new Engine(200, 140), {
+  onStuck: drill => stuckLog.push(drill.id),
+});
+stuckPractice.start();
+for (let frame = 0; frame < 899; frame++) stuckPractice.step();
+check('900フレーム未満では詰まり支援を出さない', stuckLog.length === 0);
+stuckPractice.step();
+check('900フレーム無反応で詰まり支援を出す',
+  stuckLog.length === 1 && stuckLog[0] === DRILLS[0].id);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

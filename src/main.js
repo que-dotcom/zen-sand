@@ -11,6 +11,10 @@ import { ZenAudio }     from './audio.js';
 import { ChiriRitual }  from './ritual.js';
 import { DRILLS, PracticeMode } from './practice.js';
 
+function rubyHTML(s) {
+  return s.replace(/([一-龠々〆〤ヶ]+)\{([^}]+)\}/g, '<ruby>$1<rt>$2</rt></ruby>');
+}
+
 const CELL_SIZE = 4;
 
 // 素材ではない「道具」のパレットID（負数 = engine.set に渡らない）
@@ -149,7 +153,7 @@ function init() {
   const hint = document.getElementById('hint');
   let hintTimer = null;
   function showHint(msg, duration = 1800, kids = false) {
-    hint.textContent = msg;
+    hint.innerHTML = rubyHTML(msg);
     hint.classList.toggle('kids', kids);
     hint.classList.add('show');
     clearTimeout(hintTimer);
@@ -174,7 +178,7 @@ function init() {
     const actHint = currentAct < acts.length
       ? acts[currentAct].hint
       : acts[acts.length - 1].hint;
-    scenarioBar.textContent = actHint;
+    scenarioBar.innerHTML = rubyHTML(actHint);
     scenarioBar.classList.add('show');
   }
 
@@ -219,7 +223,7 @@ function init() {
         if (!activeScenario) scenarioBar.classList.remove('show');
         return;
       }
-      scenarioBar.textContent = text;
+      scenarioBar.innerHTML = rubyHTML(text);
       scenarioBar.classList.add('show');
     },
     onState: state => {
@@ -238,6 +242,20 @@ function init() {
       }
     },
     onSuccess: () => audio.bell(),
+    onGuide: ids => {
+      suggestedIds = new Set(ids ?? []);
+      if (suggestedIds.size) {
+        const suggested = PALETTE.find(mat => suggestedIds.has(mat.id));
+        if (suggested) showGroup(suggested.group);
+      } else {
+        renderMatRow();
+      }
+    },
+    onStuck: drill => {
+      const suggested = PALETTE.find(mat => drill.place?.includes(mat.id));
+      const label = suggested?.label ?? drill.title;
+      showHint(`下{した}の 光{ひか}っている「${label}」の ボタンを 押{お}してから、画面{がめん}の 上{うえ}を なぞってみてね`, 4200, true);
+    },
     onReact: text => showHint(text, 3500, true),
     onCelebrate: replay => openPracticePopup(replay),
     onFinish:  () => setTimeout(() => {
@@ -266,12 +284,12 @@ function init() {
   function openPracticePopup(replay) {
     popupIsFinal = !practice.active;
     const drill = DRILLS[popupIsFinal ? DRILLS.length - 1 : practice.index];
-    practicePopupTitle.textContent = popupIsFinal
+    practicePopupTitle.innerHTML = rubyHTML(popupIsFinal
       ? '🎓 ぜんぶ クリア！'
-      : `⭕ せいこう！「${drill.title}」`;
-    practicePopupLearn.textContent = popupIsFinal
-      ? '16この じっけん、ぜんぶ せいこう！ きみは もう りっぱな はかせだよ。こんどは すきな ざいりょうで、じぶんだけの にわを つくってみよう。'
-      : drill.learn;
+      : `⭕ せいこう！「${drill.title}」`);
+    practicePopupLearn.innerHTML = rubyHTML(popupIsFinal
+      ? `${DRILLS.length}この じっけん、ぜんぶ 成功{せいこう}！ きみは もう りっぱな 博士{はかせ}だよ。こんどは 好{す}きな 材料{ざいりょう}で、自分{じぶん}だけの 庭{にわ}を 作{つく}ってみよう。`
+      : drill.learn);
     practicePopupNext.textContent = popupIsFinal ? 'じゆうに あそぶ' : 'つぎへ ➜';
     practicePopupClose.hidden = popupIsFinal;
 
@@ -357,6 +375,7 @@ function init() {
 
   let activeGroup = GROUPS[0];
   let selectedId  = null;
+  let suggestedIds = new Set();
 
   GROUPS.forEach(group => {
     const tab = document.createElement('button');
@@ -372,6 +391,9 @@ function init() {
     activeGroup = group;
     groupTabs.querySelectorAll('.tab-btn').forEach(t => {
       t.classList.toggle('active', t.dataset.group === group);
+      t.classList.toggle('suggest', PALETTE.some(mat =>
+        mat.group === t.dataset.group && suggestedIds.has(mat.id)
+      ));
     });
     renderMatRow();
   }
@@ -385,6 +407,7 @@ function init() {
       btn.dataset.id = mat.id;
       btn.title      = `${mat.label}  [${mat.key}]`;
       btn.classList.toggle('active', mat.id === selectedId);
+      btn.classList.toggle('suggest', suggestedIds.has(mat.id));
 
       const dot = document.createElement('span');
       dot.className        = 'dot';
