@@ -83,6 +83,7 @@ export function updateSakuraTree(engine, x, y) {
     if (meta < 64 && newMeta >= 64) {
       // Phase 1→2: ピンクの開花色に変化
       engine.colors[i] = SAKURA_BLOOM_COLS[Math.floor(Math.random() * SAKURA_BLOOM_COLS.length)];
+      engine.fireEvent('sakura_bloomed'); // 開花イベント（シナリオトリガー用）
     } else if (meta < 192 && newMeta >= 192) {
       // Phase 2→3: 淡白な散り色に変化
       engine.colors[i] = SAKURA_FADE_COLS[Math.floor(Math.random() * SAKURA_FADE_COLS.length)];
