@@ -13,7 +13,7 @@ import { Engine } from '../src/engine.js';
 import { PracticeMode, DRILLS, stageFrame, stripRuby } from '../src/practice.js';
 import * as ids from '../src/materials/ids.js';
 
-const { EMPTY, FIRE, WATER, LIGHTNING, LAVA, OIL, SEED, GOLD, SNOW, METAL } = ids;
+const { EMPTY, FIRE, WATER, LIGHTNING, LAVA, OIL, SEED, GOLD, SNOW, METAL, ACID, MUD, POLLEN, SAKURA_SEED } = ids;
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'out');
 mkdirSync(OUT, { recursive: true });
@@ -92,6 +92,15 @@ const ANSWERS = {
   },
   freeze:   f => { if (f % 2 === 0)  engine.set(cx + ((f * 5) % 99) - 49, H - 8, SNOW); },
   spark:    f => { if (f % 10 === 0) engine.set(20 + ((f * 7) % 160), H - 10, LIGHTNING); },
+  thaw:     f => { if (f % 8 === 0)  engine.set(18 + ((f * 7) % 164), H - 12, FIRE); },
+  erosion:  f => { if (f % 2 === 0)  engine.set(24 + ((f * 5) % 152), H - 32, WATER); },
+  'acid-rain': f => { if (f % 2 === 0) engine.set(24 + ((f * 7) % 152), H - 30, ACID); },
+  'glass-kiln': f => { if (f % 2 === 0) engine.set(24 + ((f * 5) % 152), H - 30, LAVA); },
+  charcoal: f => { if (f % 3 === 0)  engine.set(24 + ((f * 7) % 152), H - 18, FIRE); },
+  'mud-snow': f => { if (f % 2 === 0) engine.set(20 + ((f * 7) % 160), H - 20, MUD); },
+  'pollen-wind': f => { if (f % 2 === 0) engine.set(20 + ((f * 7) % 160), H - 16, POLLEN); },
+  'sakura-hill': f => { if (f % 3 === 0) engine.set(22 + ((f * 7) % 156), H - 22, SAKURA_SEED); },
+  'thunder-shroom': f => { if (f % 18 === 0) engine.set(20 + (((f / 18) % 20) | 0) * 8, H - 3, LIGHTNING); },
   'rust-sea': f => { if (f % 3 === 0) engine.set(20 + ((f * 7) % 160), H - 32, METAL); },
   'firefly-brook': f => { if (f % 3 === 0) engine.set(18 + ((f * 11) % 164), H - 22, WATER); },
   kintsugi: f => { if (f % 4 === 0)  engine.set(cx + (f % 2), H - 21, GOLD); },
