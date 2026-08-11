@@ -99,9 +99,13 @@ const ANSWERS = {
 
 let bells = 0;
 const barLog = [];
+const reactLog = [];
+const celebrations = [];
 const p = new PracticeMode(engine, {
   onBar: t => barLog.push(t),
   onSuccess: () => bells++,
+  onReact: text => reactLog.push(text),
+  onCelebrate: replay => celebrations.push(replay),
   onFinish: () => barLog.push('<finish-hook>'),
 });
 
@@ -143,22 +147,35 @@ console.log('所要フレーム:', perDrill.join(', '));
 check('全題が制限時間内に達成可能', stalled.length === 0, `stalled=[${stalled}]`);
 check('完走してモード終了', !p.active && p.index === DRILLS.length, `index=${p.index}`);
 check('おりんが各題で鳴った', bells === DRILLS.length, `bells=${bells}`);
-check('皆伝メッセージ表示', barLog.some(t => typeof t === 'string' && t.includes('皆伝')));
+check('各題で反応トーストが1回ずつ出た',
+  reactLog.length === DRILLS.length && new Set(reactLog).size === DRILLS.length,
+  `reacts=${reactLog.length}`);
+check('成功90フレーム後に各題のリプレイが出た',
+  celebrations.length === DRILLS.length && celebrations.every(replay =>
+    replay.frames.length >= 30 && replay.frames.every(frame =>
+      frame.length === replay.width * replay.height)),
+  `celebrations=${celebrations.length}`);
+check('皆伝メッセージ表示', barLog.some(t => typeof t === 'string' && t.includes('ぜんぶ クリア！')));
 check('各題のヒントが表示された',
   DRILLS.every(d => barLog.some(t => typeof t === 'string' && t.includes(`「${d.title}」 — `))));
 check('成功メッセージが各題に出た',
   barLog.filter(t => typeof t === 'string' && t.startsWith('⭕')).length === DRILLS.length);
 
 const manualEngine = new Engine(200, 140);
-const manualPractice = new PracticeMode(manualEngine);
+let skippedCelebrations = 0;
+const manualPractice = new PracticeMode(manualEngine, {
+  onCelebrate: () => skippedCelebrations++,
+});
 manualPractice.start();
 for (let x = 0; x < 12; x++) manualEngine.set(x, 100, FIRE);
 manualPractice.step();
-for (let f = 0; f < 240; f++) { manualEngine.update(); manualPractice.step(); }
 check('成功後は自動で次の実験へ進まない',
   manualPractice.active && manualPractice.index === 0 && manualPractice.state === 'ready');
 manualPractice.skip();
 check('次へ操作で次の実験へ進む', manualPractice.index === 1 && manualPractice.state === 'trying');
+for (let f = 0; f < 120; f++) { manualEngine.update(); manualPractice.step(); }
+check('ready中に次へを押すとリプレイを出さない', skippedCelebrations === 0,
+  `celebrations=${skippedCelebrations}`);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

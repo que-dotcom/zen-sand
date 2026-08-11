@@ -403,3 +403,38 @@ spec.md（作成要領準拠・液体/落下素材限定を絶対条件化・報
 - ブラウザ実機スモーク未実施（第5弾から継続の環境制約。Chrome 接続時に 🧪→16題・新2題の表示確認）
 
 === 第7弾 実装・検収完了 at 2026-08-12 ===
+
+## 2026-08-12 第8弾: 実験帳の学習モード化（codex-delegate 協業）
+
+対象は PC 操作に不慣れな小中学生。ユーザ要望4点を Claude 設計+文言 / Codex 実装で消化。
+
+### 実装内容（コミット対象）
+
+- キャンバスの高さを「window - 下部バー」に変更（舞台がバーの裏に隠れる問題を解消。
+  #ui は bottom:0 に接地）
+- ブラシ初期値 3→5
+- DRILLS 全16題に react（反応した瞬間のひらがな一言）と learn（2〜3文のひらがな解説）を追加、
+  hint もひらがな口調に差し替え。文言は spec.md（Claude 起草）を一字一句転記
+- practice.js に DOM 非依存の録画（3フレームごとに engine.colors をリングバッファ、最大120枚）。
+  成功で ready→90フレーム余韻→onCelebrate(replay)。skip/stop で破棄
+- main.js に成功ポップアップ #practice-popup: リプレイを 20fps ループ再生
+  （hexToPixel と同じ ABGR 変換、0=背景色）+ learn + 大きな「つぎへ ➜」/「もどって ながめる」。
+  最終題は 🎓 皆伝ポップアップ+「じゆうに あそぶ」（Codex の設計判断: リプレイ表示時にモード終了）
+- 反応トーストは #hint.kids（3.5秒・大きめ文字）。window.__zen = {engine, practice, input} を公開
+
+### 検収
+
+- 文言16題×3種の diff 照合: spec と完全一致。practice.js の DOM 非依存維持を確認
+- practice 11/11 PASS ×2回連続（新アサーション: react 各題1回 / celebrate 90f 後・30枚以上 /
+  ready中スキップで celebrate 無し）、scenario 20/20、node --check OK
+- CDP 実機スモーク 11項目 PASS: バー重なり解消・ブラシ5・ひらがなヒント・反応トースト・
+  ポップアップ表示・リプレイのフレーム変化・つぎへで 2/16・エラー0件。ポップアップの
+  スクリーンショット目視も実施（炎が草原を走るリプレイを確認）
+- 障害1（検証側）: 旧スモークの python サーバと headless Chrome が残留し、
+  デバッグポート9333を旧インスタンスが握り続けて古いコードを検証していた。
+  この環境の Git Bash に pkill は無い — netstat -ano でポートの PID を特定し
+  taskkill //F //PID で止めるのが正。retry: 3/3 で発見
+- 障害2（検証側）: CDP の Runtime.evaluate はグローバル字句スコープを共有し、
+  別呼び出しの const が再宣言エラーになる → 全評価式を IIFE で包む
+
+=== 第8弾 実装・検収完了 at 2026-08-12 ===

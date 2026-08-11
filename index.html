@@ -24,7 +24,7 @@
     <div class="nav-row" id="controls">
       <span class="ui-label">ブラシ</span>
       <button id="brush-dec" class="ctl-btn" title="ブラシを小さく">⊖</button>
-      <span id="brush-val">3</span>
+      <span id="brush-val">5</span>
       <button id="brush-inc" class="ctl-btn" title="ブラシを大きく">⊕</button>
       <span class="ctl-sep"></span>
       <button id="scenario-btn" class="ctl-btn" title="シナリオ">🎬</button>
@@ -44,6 +44,19 @@
         <button id="scenario-modal-close">✕</button>
       </div>
       <div id="scenario-list"></div>
+    </div>
+  </div>
+
+  <!-- Practice success replay -->
+  <div id="practice-popup" aria-hidden="true">
+    <div id="practice-popup-card" role="dialog" aria-modal="true" aria-labelledby="practice-popup-title">
+      <h2 id="practice-popup-title"></h2>
+      <canvas id="practice-replay"></canvas>
+      <p id="practice-popup-learn"></p>
+      <div id="practice-popup-actions">
+        <button id="practice-popup-next" class="practice-popup-primary">つぎへ ➜</button>
+        <button id="practice-popup-close" class="practice-popup-secondary">もどって ながめる</button>
+      </div>
     </div>
   </div>
 

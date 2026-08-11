@@ -9,7 +9,7 @@ import { EMPTY, SAND, WATER, WALL, SNOW, FIRE, OIL, LAVA, COAL,
 import { SCENARIOS, MATERIAL_TRIGGER_MAP } from './scenarios.js';
 import { ZenAudio }     from './audio.js';
 import { ChiriRitual }  from './ritual.js';
-import { PracticeMode } from './practice.js';
+import { DRILLS, PracticeMode } from './practice.js';
 
 const CELL_SIZE = 4;
 
@@ -104,8 +104,9 @@ function init() {
   const canvas = document.getElementById('canvas');
 
   function resize() {
+    const uiH = document.getElementById('ui').offsetHeight;
     const w = Math.floor(window.innerWidth  / CELL_SIZE);
-    const h = Math.floor(window.innerHeight / CELL_SIZE);
+    const h = Math.floor((window.innerHeight - uiH) / CELL_SIZE);
     canvas.width  = w * CELL_SIZE;
     canvas.height = h * CELL_SIZE;
     return { w, h };
@@ -147,11 +148,14 @@ function init() {
   // ── Hint toast ────────────────────────────────────────────────────────────
   const hint = document.getElementById('hint');
   let hintTimer = null;
-  function showHint(msg) {
+  function showHint(msg, duration = 1800, kids = false) {
     hint.textContent = msg;
+    hint.classList.toggle('kids', kids);
     hint.classList.add('show');
     clearTimeout(hintTimer);
-    hintTimer = setTimeout(() => hint.classList.remove('show'), 1800);
+    hintTimer = setTimeout(() => {
+      hint.classList.remove('show', 'kids');
+    }, duration);
   }
 
   // ── Scenario system ───────────────────────────────────────────────────────
@@ -234,9 +238,77 @@ function init() {
       }
     },
     onSuccess: () => audio.bell(),
+    onReact: text => showHint(text, 3500, true),
+    onCelebrate: replay => openPracticePopup(replay),
     onFinish:  () => setTimeout(() => {
       if (!practice.active && !activeScenario) scenarioBar.classList.remove('show');
     }, 4000),
+  });
+
+  // ── 実験帳の成功ポップアップ ─────────────────────────────────────────────
+  const practicePopup = document.getElementById('practice-popup');
+  const practicePopupTitle = document.getElementById('practice-popup-title');
+  const practicePopupLearn = document.getElementById('practice-popup-learn');
+  const practiceReplay = document.getElementById('practice-replay');
+  const practiceReplayCtx = practiceReplay.getContext('2d');
+  const practicePopupNext = document.getElementById('practice-popup-next');
+  const practicePopupClose = document.getElementById('practice-popup-close');
+  let replayTimer = null;
+  let popupIsFinal = false;
+
+  function closePracticePopup() {
+    clearInterval(replayTimer);
+    replayTimer = null;
+    practicePopup.classList.remove('show');
+    practicePopup.setAttribute('aria-hidden', 'true');
+  }
+
+  function openPracticePopup(replay) {
+    popupIsFinal = !practice.active;
+    const drill = DRILLS[popupIsFinal ? DRILLS.length - 1 : practice.index];
+    practicePopupTitle.textContent = popupIsFinal
+      ? '🎓 ぜんぶ クリア！'
+      : `⭕ せいこう！「${drill.title}」`;
+    practicePopupLearn.textContent = popupIsFinal
+      ? '16この じっけん、ぜんぶ せいこう！ きみは もう りっぱな はかせだよ。こんどは すきな ざいりょうで、じぶんだけの にわを つくってみよう。'
+      : drill.learn;
+    practicePopupNext.textContent = popupIsFinal ? 'じゆうに あそぶ' : 'つぎへ ➜';
+    practicePopupClose.hidden = popupIsFinal;
+
+    clearInterval(replayTimer);
+    practiceReplay.width = replay.width;
+    practiceReplay.height = replay.height;
+    const image = practiceReplayCtx.createImageData(replay.width, replay.height);
+    const pixels = new Uint32Array(image.data.buffer);
+    const background = (0xFF << 24) | (0x0A << 16) | (0x0A << 8) | 0x0A;
+    const toPixel = hex => {
+      const r = (hex >> 16) & 0xFF;
+      const g = (hex >> 8) & 0xFF;
+      const b = hex & 0xFF;
+      return (0xFF << 24) | (b << 16) | (g << 8) | r;
+    };
+    let frame = 0;
+    const renderReplay = () => {
+      const colors = replay.frames[frame];
+      for (let i = 0; i < colors.length; i++) {
+        pixels[i] = colors[i] === 0 ? background : toPixel(colors[i]);
+      }
+      practiceReplayCtx.putImageData(image, 0, 0);
+      frame = (frame + 1) % replay.frames.length;
+    };
+    renderReplay();
+    replayTimer = setInterval(renderReplay, 50);
+    practicePopup.classList.add('show');
+    practicePopup.setAttribute('aria-hidden', 'false');
+  }
+
+  practicePopupNext.addEventListener('click', () => {
+    closePracticePopup();
+    if (!popupIsFinal) practice.skip();
+  });
+  practicePopupClose.addEventListener('click', closePracticePopup);
+  practicePopup.addEventListener('click', e => {
+    if (e.target === practicePopup) closePracticePopup();
   });
 
   // ── Scenario modal ────────────────────────────────────────────────────────
@@ -346,7 +418,10 @@ function init() {
   selectMaterial(SAND);
 
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeModal();
+    if (e.key === 'Escape') {
+      closeModal();
+      closePracticePopup();
+    }
     const mat = PALETTE.find(p => p.key === e.key);
     if (mat) selectMaterial(mat.id);
   });
@@ -367,7 +442,7 @@ function init() {
     .addEventListener('click', () => setBrush(input.brushRadius - 1));
   document.getElementById('brush-inc')
     .addEventListener('click', () => setBrush(input.brushRadius + 1));
-  setBrush(input.brushRadius);
+  setBrush(5);
 
   // ── UI: 実験帳 ───────────────────────────────────────────────────────────
   const practiceBtn = document.getElementById('practice-btn');
@@ -411,6 +486,7 @@ function init() {
 
   // ── UI: clear ────────────────────────────────────────────────────────────
   document.getElementById('clear-btn').addEventListener('click', () => {
+    closePracticePopup();
     practice.stop();
     engine.clear();
     activeScenario = null;
@@ -446,6 +522,7 @@ function init() {
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
+  window.__zen = { engine, practice, input };
 }
 
 document.addEventListener('DOMContentLoaded', init);

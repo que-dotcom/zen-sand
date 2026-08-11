@@ -14,6 +14,7 @@ body {
 
 #canvas {
   display: block;
+  height: auto;
   cursor: crosshair;
   touch-action: none;
 }
@@ -23,7 +24,7 @@ body {
    横スクロールは使わない。どのタブを選んでも素材は最大6個なので必ず収まる。   */
 #ui {
   position: fixed;
-  bottom: 18px;
+  bottom: 0;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -202,6 +203,12 @@ body {
   opacity: 1;
 }
 
+#hint.kids {
+  font-size: 18px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.92);
+}
+
 /* Scenario act hint bar (persistent) */
 #scenario-bar {
   position: fixed;
@@ -241,6 +248,100 @@ body {
 
 #scenario-modal.show {
   display: flex;
+}
+
+/* Practice success replay */
+#practice-popup {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.78);
+  z-index: 30;
+}
+
+#practice-popup.show {
+  display: flex;
+}
+
+#practice-popup-card {
+  width: min(760px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 24px;
+  background: #151722;
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.55);
+}
+
+#practice-popup-title {
+  margin-bottom: 16px;
+  color: rgba(255, 255, 255, 0.96);
+  font-size: clamp(22px, 4vw, 32px);
+  text-align: center;
+}
+
+#practice-replay {
+  display: block;
+  width: 100%;
+  height: min(56vh, 420px);
+  background: #0A0A0A;
+  image-rendering: pixelated;
+  object-fit: fill;
+}
+
+#practice-popup-learn {
+  margin: 18px auto;
+  max-width: 32em;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: clamp(18px, 3vw, 23px);
+  line-height: 1.8;
+}
+
+#practice-popup-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.practice-popup-primary,
+.practice-popup-secondary {
+  min-height: 52px;
+  border-radius: 14px;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+@media (max-width: 480px) {
+  #practice-popup {
+    padding: 10px;
+  }
+
+  #practice-popup-card {
+    padding: 18px;
+  }
+
+  #practice-popup-actions {
+    flex-direction: column;
+  }
+}
+
+.practice-popup-primary {
+  padding: 12px 30px;
+  border: 1px solid #8fd8ff;
+  background: #3a87c8;
+  color: white;
+  font-weight: 700;
+}
+
+.practice-popup-secondary {
+  padding: 12px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
 }
 
 #scenario-modal-box {
@@ -364,7 +465,7 @@ body {
   #ui {
     left: 8px;
     right: 8px;
-    bottom: 8px;
+    bottom: 0;
     transform: none;
     max-width: none;
     border-radius: 18px;
