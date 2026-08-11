@@ -44,6 +44,8 @@ export const FIREFLY      = 39; // 蛍（植物+水から自然発生・明滅�
 export const POLLEN       = 40; // 花粉（逆重力型・遺伝子を運ぶ大気搬送粒子）
 export const MA_VOID      = 41; // 間（封じられた聖域・空白の力）
 export const KOI          = 42; // 鯉（水中を泳ぐ自律エージェント）
+export const GOLD         = 45; // 金（溶けた金。最重量級の粘性液体、割れ目で凝固）
+export const KINTSUGI     = 46; // 金継ぎ（金が割れ目で固まった継ぎ目。非パレット・反応生成のみ）
 // ─── 振動波（内部素材、パレット不使用）─────────────────────────────────────────
 export const VIBRATION = 44; // 雷が伝導体に命中した際に発生する衝撃波信号
 

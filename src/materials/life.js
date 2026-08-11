@@ -164,6 +164,7 @@ export function updatePlant(engine, x, y) {
           engine.colors[fi]  = 0xFFFF44;
           engine.meta[fi]    = Math.floor(Math.random() * 255); // ランダムな明滅フェーズから開始
           engine.updated[fi] = 1;
+          engine.fireEvent('firefly_born'); // 蛍の自然発生イベント（シナリオトリガー用）
           break;
         }
       }

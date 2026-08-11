@@ -167,6 +167,9 @@ export function updateIce(engine, x, y) {
     const n = engine.get(x+dx, y+dy);
     if (n === FIRE  && Math.random() > 0.90) { engine.set(x, y, WATER); return; }
     if (n === LAVA  && Math.random() > 0.60) {
+      // 急冷: 氷が融ける瞬間、触れていた溶岩は黒曜石に固まる
+      // （これがないと融け水+溶岩→石の皮が先に張り、黒曜石がほぼ生まれない）
+      engine.set(x+dx, y+dy, OBSIDIAN);
       engine.set(x, y, WATER);
       if (engine.inBounds(x, y-1) && engine.get(x, y-1) === EMPTY) { engine.set(x, y-1, STEAM); engine.meta[engine.idx(x, y-1)] = 0; }
       return;

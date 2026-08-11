@@ -114,9 +114,11 @@ export function updateLavaSpring(engine, x, y) {
 
 export function updateObsidian(engine, x, y) {
   // 黒曜石: 溶岩でのみ溶ける。酸・雷・水に完全耐性
+  // 再溶融は 0.3%/frame とごく遅い。3% だと「石は残るのに黒曜石は溶岩に食われて
+  // 消える」非対称で、溶岩+冷却系が必ず全部石に収束してしまう（急冷の見せ場が消える）
   const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
   for (const [dx,dy] of nb4) {
-    if (engine.get(x+dx, y+dy) === LAVA && Math.random() > 0.97) {
+    if (engine.get(x+dx, y+dy) === LAVA && Math.random() > 0.997) {
       engine.set(x, y, LAVA); return;
     }
   }

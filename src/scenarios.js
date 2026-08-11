@@ -1,7 +1,8 @@
 import {
   EMPTY, WATER, WALL, LAVA, SOIL, SEED, PLANT, GLOW_FUNGUS,
   FLOWER, DARK_PLANT, DARK_FLOWER, METAL, MUD, OBSIDIAN, BASALT, SPRING, LAVA_SPRING,
-  ACID, ICE, LIGHTNING, FIRE, OIL, COAL, SNOW, ASH, STEAM
+  ACID, ICE, LIGHTNING, FIRE, OIL, COAL, SNOW, ASH, STEAM,
+  SAND, STONE, KOI, GOLD, SAKURA_SEED
 } from './materials.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -260,6 +261,113 @@ export function loadFrozenCursedForest(engine) {
   }
 }
 
+// ── 「金継ぎ」 layout ─────────────────────────────────────────────────────────
+
+export function loadKintsugi(engine) {
+  engine.clear();
+
+  const W  = engine.width;
+  const H  = engine.height;
+  const cx = Math.floor(W / 2);
+
+  // ── Key coordinates ─────────────────────────────────────────────────────
+  const yWall  = Math.floor(H * 0.92);            // 底面ウォール
+  const ySandT = yWall - 6;                       // 砂庭の天面（6セル厚）
+  const dHW    = Math.max(16, Math.floor(W * 0.17)); // 台座の半幅
+  const yDaisB = yWall - 7;                       // 台座 底（砂の上）
+  const yDaisT = yDaisB - 2;                      // 台座 天（3セル厚）
+  const R      = Math.min(Math.floor(W * 0.13), Math.floor(H * 0.30)); // 器の半径
+  const Rin    = R - 3;                           // 器の内径（殻の厚さ3）
+  const cy0    = yDaisT - 1 - R;                  // 器の中心（縁の高さ）
+
+  // ── 1. 底面ウォールと砂庭 ────────────────────────────────────────────────
+  hLine(engine, 0, W - 1, yWall, WALL);
+  fillRect(engine, 0, ySandT, W - 1, yWall - 1, SAND);
+
+  // ── 2. 玄武岩の台座 ─────────────────────────────────────────────────────
+  fillRect(engine, cx - dHW, yDaisT, cx + dHW, yDaisB, BASALT);
+
+  // ── 3. 石の器（下半円の殻、厚さ3）────────────────────────────────────────
+  for (let y = cy0; y <= cy0 + R; y++) {
+    for (let x = cx - R; x <= cx + R; x++) {
+      const dx = x - cx, dy = y - cy0;
+      const d2 = dx * dx + dy * dy;
+      if (d2 <= R * R && d2 >= Rin * Rin) set(engine, x, y, STONE);
+    }
+  }
+
+  // ── 4. 割れ目を刻む（3本、幅2）— 金が流れ込んで挟まる場所 ────────────────
+  //   角度は「下=90°」基準。器の底部〜左右下に走る
+  const cracks = [65, 105, 150];
+  for (const deg of cracks) {
+    const a = deg * Math.PI / 180;
+    for (let t = Rin - 1; t <= R + 1; t += 0.5) {
+      const px = Math.round(cx  + Math.cos(a) * t);
+      const py = Math.round(cy0 + Math.sin(a) * t);
+      set(engine, px,     py, EMPTY);
+      set(engine, px + 1, py, EMPTY);
+    }
+  }
+
+  // ── 5. 欠けた破片が砂の上に散っている（割れの余韻）──────────────────────
+  fillRect(engine, cx - dHW - 10, ySandT - 2, cx - dHW - 8, ySandT - 1, STONE);
+  fillRect(engine, cx + dHW + 6,  ySandT - 1, cx + dHW + 8, ySandT - 1, STONE);
+  set(engine, cx + dHW + 7, ySandT - 2, STONE);
+}
+
+// ── 「桜と蛍」 layout ─────────────────────────────────────────────────────────
+
+export function loadSakuraFirefly(engine) {
+  engine.clear();
+
+  const W  = engine.width;
+  const H  = engine.height;
+  const cx = Math.floor(W / 2);
+
+  // ── Key coordinates ─────────────────────────────────────────────────────
+  const yWall   = Math.floor(H * 0.90); // 底面ウォール
+  const yBsltT  = yWall - 2;            // 玄武岩 天（2セル厚）
+  const ySoilT  = yWall - 5;            // 土 天（3セル厚）
+  const yGround = ySoilT - 1;           // 地表（植物の根元）
+
+  const pondCx = cx - Math.floor(W * 0.12); // 池の中心（中央やや左）
+  const pw     = Math.max(8, Math.floor(W * 0.11)); // 池の半幅
+  const pondL  = pondCx - pw;
+  const pondR  = pondCx + pw;
+
+  // ── 1. 底面ウォール・玄武岩・土 ─────────────────────────────────────────
+  hLine(engine, 0, W - 1, yWall, WALL);
+  fillRect(engine, 0, yBsltT, W - 1, yWall - 1, BASALT);
+  fillRect(engine, 0, ySoilT, W - 1, yBsltT - 1, SOIL);
+
+  // ── 2. 池（石張りの窪みに水を湛え、鯉を放つ）────────────────────────────
+  vLine(engine, pondL - 1, ySoilT - 1, yBsltT, STONE);
+  vLine(engine, pondR + 1, ySoilT - 1, yBsltT, STONE);
+  hLine(engine, pondL - 1, pondR + 1, yBsltT, STONE);
+  fillRect(engine, pondL, ySoilT - 1, pondR, yBsltT - 1, WATER);
+  set(engine, pondCx, yBsltT - 2, KOI);
+
+  // ── 3. 池のほとりの草花（蛍の生まれる場所: 水から3セル以内に植える）──────
+  const shoreXs = [pondL - 3, pondL - 2, pondR + 2, pondR + 3, pondR + 5];
+  for (const px of shoreXs) {
+    const ph = 2 + Math.floor(Math.random() * 3);
+    for (let py = yGround - ph + 1; py <= yGround; py++) {
+      if (engine.inBounds(px, py) && engine.get(px, py) === EMPTY) {
+        set(engine, px, py, PLANT);
+      }
+    }
+    if (Math.random() > 0.4 && engine.get(px, yGround - ph) === EMPTY) {
+      set(engine, px, yGround - ph, FLOWER);
+    }
+  }
+
+  // ── 4. 岩組（右手の石庭）───────────────────────────────────────────────
+  const rockX = cx + Math.floor(W * 0.20);
+  fillRect(engine, rockX, yGround - 1, rockX + 2, yGround, STONE);
+  set(engine, rockX + 1, yGround - 2, STONE);
+  fillRect(engine, rockX + 6, yGround, rockX + 7, yGround, STONE);
+}
+
 // ── Act trigger constants ─────────────────────────────────────────────────────
 export const TRIGGERS = {
   ACID_USED:      'acid_used',
@@ -270,7 +378,12 @@ export const TRIGGERS = {
   WATER_USED:     'water_used',
   OIL_USED:       'oil_used',
   COAL_USED:      'coal_used',
-  PLANT_SPAWNED:  'plant_spawned', // エンジンイベント: 種が発芽した（プレイヤー入力不要）
+  GOLD_USED:        'gold_used',
+  SAKURA_SEED_USED: 'sakura_seed_used',
+  PLANT_SPAWNED:  'plant_spawned',   // エンジンイベント: 種が発芽した（プレイヤー入力不要）
+  KINTSUGI_FORMED:  'kintsugi_formed', // エンジンイベント: 金が割れ目で凝固した
+  SAKURA_BLOOMED:   'sakura_bloomed',  // エンジンイベント: 桜が開花期に入った
+  FIREFLY_BORN:     'firefly_born',    // エンジンイベント: 蛍が自然発生した
 };
 
 // Material ID → trigger name mapping (プレイヤー入力ベース)
@@ -283,10 +396,68 @@ export const MATERIAL_TRIGGER_MAP = {
   [WATER]:     TRIGGERS.WATER_USED,
   [OIL]:       TRIGGERS.OIL_USED,
   [COAL]:      TRIGGERS.COAL_USED,
+  [GOLD]:        TRIGGERS.GOLD_USED,
+  [SAKURA_SEED]: TRIGGERS.SAKURA_SEED_USED,
 };
 
 // ── Scenarios ─────────────────────────────────────────────────────────────────
 export const SCENARIOS = [
+  {
+    id:         'sakura_firefly',
+    title:      '桜と蛍',
+    subtitle:   '花・宵・蛍の四幕劇',
+    emoji:      '🌸',
+    difficulty: '★',
+    load:       loadSakuraFirefly,
+    acts: [
+      {
+        trigger: null,
+        hint: '宵の庭。桜の種を、池のほとりに蒔こう。  [j] キー',
+      },
+      {
+        trigger: TRIGGERS.SAKURA_SEED_USED,
+        hint: '待とう。水辺の種は、やがて目を覚ます。',
+      },
+      {
+        trigger: TRIGGERS.SAKURA_BLOOMED,
+        hint: '咲いた。花は、散るまでが花。',
+      },
+      {
+        trigger: TRIGGERS.FIREFLY_BORN,
+        hint: '蛍が灯った。眺め終えたら、🍃 で風に還そう。',
+      },
+    ],
+  },
+  {
+    id:         'kintsugi',
+    title:      '金継ぎ',
+    subtitle:   '破れ・金・景色の五幕劇',
+    emoji:      '🏺',
+    difficulty: '★★',
+    load:       loadKintsugi,
+    acts: [
+      {
+        trigger: null,
+        hint: '割れた器がある。金を割れ目に注ごう。  [n] キー',
+      },
+      {
+        trigger: TRIGGERS.GOLD_USED,
+        hint: '金が流れる。割れ目に満ちて、固まるのを待とう。',
+      },
+      {
+        trigger: TRIGGERS.KINTSUGI_FORMED,
+        hint: '継ぎ目が生まれた。雷を落とせば、金は脈打つ。  [t] キー',
+      },
+      {
+        trigger: TRIGGERS.LIGHTNING_USED,
+        hint: '器は直った。水を注いで、確かめよう。  [2] キー',
+      },
+      {
+        trigger: TRIGGERS.WATER_USED,
+        hint: '—— 割れも、この器の景色 ——',
+      },
+    ],
+  },
   {
     id:         'frozen_cursed_forest',
     title:      '凍った呪いの森',

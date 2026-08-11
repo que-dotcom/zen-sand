@@ -1,7 +1,8 @@
 import {
   EMPTY, WATER, LAVA, ICE, RUST, MUD, METAL, LIGHTNING, SPARK, SAND, GLASS,
   OIL, FIRE, SMOKE, COAL, SNOW, SOIL, STEAM, PLANT, FLOWER, DARK_FLOWER, DARK_PLANT,
-  FUNGUS, GLOW_FUNGUS, SEED, ASH, SAKURA_TREE, SAKURA_PETAL, VIBRATION, SANDSTONE
+  FUNGUS, GLOW_FUNGUS, SEED, ASH, SAKURA_TREE, SAKURA_PETAL, VIBRATION, SANDSTONE,
+  KINTSUGI
 } from './ids.js';
 import {
   META_ICE_CRYSTAL, SAKURA_BLOOM_COLS, CONDUCTOR_IDS, VIB_STR_SHIFT, VIBRATION_COLS,
@@ -303,6 +304,16 @@ function _vibRestore(engine, x, y, matIdx, str) {
     // 強衝撃: 金属の超冷却フラグ等をリセット（振動の余熱で状態が戻る）
     engine.set(x, y, METAL);
     engine.meta[i] = 0;
+    return;
+  }
+  if (originalMat === KINTSUGI) {
+    // 金は砕けない。振動が通ると継ぎ目が白金色に瞬き、金の火花が散る
+    engine.set(x, y, KINTSUGI);
+    engine.colors[i] = 0xFFE870;
+    if (str >= 1 && Math.random() < 0.35 &&
+        engine.inBounds(x, y-1) && engine.get(x, y-1) === EMPTY) {
+      engine.set(x, y-1, SPARK);
+    }
     return;
   }
 

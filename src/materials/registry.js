@@ -3,12 +3,13 @@ import {
   GLASS, SOIL, SEED, PLANT, DARK_PLANT, FUNGUS, GLOW_FUNGUS, FLOWER, DARK_FLOWER,
   METAL, LIGHTNING, SPARK, RUST, STEAM, ACID, MUD, ICE, HARD_SOIL, ACID_PLANT,
   OBSIDIAN, SANDSTONE, BASALT, SPRING, LAVA_SPRING, SAKURA_SEED, SAKURA_TREE,
-  SAKURA_PETAL, FIREFLY, POLLEN, MA_VOID, KOI, KOI_BODY, VIBRATION
+  SAKURA_PETAL, FIREFLY, POLLEN, MA_VOID, KOI, KOI_BODY, VIBRATION, GOLD, KINTSUGI
 } from './ids.js';
 import {
   FLOWER_COLORS, FLOWER_CENTER, DARK_F_COLORS, DARK_F_CENTER, ACID_STEM_COLS,
   SAKURA_SEED_COLS, SAKURA_TRUNK_COLS, SAKURA_BRANCH_COLS, SAKURA_PETAL_COLS,
-  FIREFLY_COLS, POLLEN_COLS, MA_VOID_COLS, KOI_COLS, VIBRATION_COLS
+  FIREFLY_COLS, POLLEN_COLS, MA_VOID_COLS, KOI_COLS, VIBRATION_COLS,
+  GOLD_COLS, KINTSUGI_COLS
 } from './meta.js';
 import {
   updateSand, updateWater, updateSnow, updateFire, updateOil, updateLava,
@@ -37,6 +38,9 @@ import {
 import {
   updateMaVoid, updateKoi, updateKoiBody
 } from './agents.js';
+import {
+  updateGold, updateKintsugi
+} from './kintsugi.js';
 
 // ─── Material definitions ──────────────────────────────────────────────────────
 export const MATERIALS = {
@@ -86,5 +90,7 @@ export const MATERIALS = {
   [KOI]:          { name: 'koi',          colors: [...KOI_COLS],                                                         update: updateKoi         },
   [KOI_BODY]:     { name: 'koi_body',    colors: [...KOI_COLS],                                                         update: updateKoiBody     },
   [VIBRATION]:    { name: 'vibration',   colors: [...VIBRATION_COLS],                                                   update: updateVibration   },
+  [GOLD]:         { name: 'gold',        colors: [...GOLD_COLS],                                                        update: updateGold        },
+  [KINTSUGI]:     { name: 'kintsugi',    colors: [...KINTSUGI_COLS],                                                    update: updateKintsugi    },
 };
 

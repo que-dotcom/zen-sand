@@ -1,6 +1,6 @@
 # 開発計画
 
-## 第3弾 PR1: 下部バーの再編（2026-08-11 着手）
+## PR1: 下部バーの再編（2026-08-11 着手）
 
 仕様: `docs/keyboard-mode-design.md` の §1（グループ再編）・§2（3行レイアウト）・§7-1。
 範囲は **マウス操作のみ・素材の挙動不変・見た目とDOM構造だけ**。キーボード操作は PR2 以降。
@@ -58,6 +58,103 @@
 - intent: PR1 をコミットする
 - verification: git log に新コミット
 - risk: requires-approval
+
+---
+
+## 第6弾: 実験帳の手順明確化・手動遷移・新題追加（2026-08-11 ユーザフィードバック）
+
+### 仕様要約
+
+- 墨田の夜は、水 [2] を炭田へ注いで墨泥を作ってから、種 [w] を墨泥の上へ蒔く2段階を
+  画面上で明示する。
+- 成功後は反応を止めず、自動遷移もしない。🧪ボタンを「次へ」に切り替え、プレイヤーが
+  押した時だけ次の舞台を読み込む。
+- 新題候補「砂の炉」: 砂丘へ溶岩 [6] を流し、砂岩を作る。成立性を8試行以上で確認する。
+
+### Tasks
+
+- task-501: 墨田の夜の段階別ヒントと成功後の手動遷移を実装・状態遷移をテスト — risk: safe
+- task-502: 砂の炉の単体プローブ、舞台、正答ボットを追加 — risk: safe
+- task-503: 全題を2回連続、既存シナリオ回帰、舞台PNGで検証 — risk: safe
+- task-504: ブラウザスモーク — risk: safe
+- task-505: コミット — risk: requires-approval
+
+---
+
+## 第5弾: 実験帳の反応題増設（2026-08-11 ユーザ依頼: 著しい変化を追加）
+
+### 仕様要約
+
+- 既存の10題と異なる、視覚的な変化が大きい反応を追加する。候補の選定・舞台設計・成功判定は
+  `docs/practice-drill-guide.md` に従い、素材コードを変えずに実施する。
+- 候補: 油田爆発（油+雷→炎）／夜光洞（菌+油→発光菌）／墨田の夜（炭+水+種→暗黒植物）。
+- すべて機械プレイで複数回完走と既存シナリオ回帰を確認してから採用する。
+
+### Tasks
+
+- task-401: 3候補の単体プローブで成立率・生成物数・初期舞台の安定性を測定 — risk: safe
+- task-402: 合格した候補を `DRILLS` に画面全体の情景として追加 — risk: safe
+- task-403: 機械プレイの正答ボット・検証条件を更新 — risk: safe
+- task-404: 実験帳を2回連続、シナリオ回帰を実行し、舞台PNGを確認 — risk: safe
+- task-405: ブラウザスモーク — risk: safe
+- task-406: コミット — risk: requires-approval
+
+---
+
+## 第4弾: 実験帳モード（2026-08-11 ユーザ依頼: 化学反応の練習モード）
+
+### 仕様要約
+
+- シナリオとは別の練習モード「実験帳」🧪。お題の化学反応を順に出し、
+  小さな舞台を自動設置 → プレイヤーが素材を注いで反応を起こす → 生成物のセル数が
+  閾値を超えたら ⭕成功（おりんの音）→ 約2秒後に次のお題。全10題で皆伝。
+- 検出方式: **生成物セル数のベースラインからの増分**。素材コードは一切変更しない
+  （盤面を数えるだけの汎用方式。全反応に適用できる）
+- 10題: 蒸気 / 燃焼 / 石化 / ガラス / 黒曜石 / 玄武岩 / 発芽 / 墨 / 感電 / 金継ぎ
+- 操作: 🧪で開始、実験中に🧪でスキップ、クリアで退出。ヒントはシナリオバーを共用
+
+### Tasks
+
+- task-301: plan.md 追記（このエントリ）— risk: safe
+- task-302: src/practice.js 新規（PracticeMode クラス + DRILLS 10題 + 舞台設置。DOM非依存）— risk: safe
+- task-303: main.js 配線（practice-btn、ループに step()、シナリオ/クリアとの排他）+ index.html に🧪ボタン — risk: safe
+- task-304: docs/keyboard-mode-design.md の操作行に🧪を追記（3箇所）— risk: safe
+- task-305: Node 検証 — 全10題を機械プレイして完走できること（各題の達成可能性の実証）— risk: safe
+- task-306: ブラウザスモーク（ボタン動作・バー表示・エラー0件）— risk: safe
+- task-308: README を実験帳・現在の操作・33素材の状態へ更新し、検証導線を作成要領へ集約 — risk: safe
+- task-307: コミット — risk: requires-approval
+
+---
+
+## 第3弾: シナリオ2本増設（2026-08-11 ユーザ選択済み: ①金継ぎ + ⑤桜と蛍）
+
+### 仕様要約
+
+- **金継ぎ 🏺（★★・五幕）**: 割れた石の器に溶けた金を注いで継ぐ「直す物語」。
+  新素材2つ: 金（GOLD=45、最重量級の粘性液体）と 金継ぎ（KINTSUGI=46、非パレット・反応生成のみ）。
+  化学: 金は鉱物固体2面以上に挟まれると凝固（割れ目でだけ固まる）／氷・雪で急冷凝固／
+  溶岩で金継ぎ→金に再溶解／酸は金に無反応（updateAcid のリスト外なので自動的に不活性 = 金の骨格が残る）／
+  金継ぎは伝導体（CONDUCTOR_IDS[7]、3bitマスク最後の枠）で雷の振動波が継ぎ目を走る。
+- **桜と蛍 🌸（★・四幕）**: 既存素材のみ。宵の庭に桜種を蒔き、開花を待ち、蛍を眺める。
+- 新イベント: kintsugi_formed（金凝固時）/ sakura_bloomed（Phase1→2境界）/ firefly_born（蛍自然発生時）
+- パレット: 金を「電気」グループ・キー n に追加（侘寂は6個満杯のため。金属つながり）
+
+### Tasks
+
+- task-201: plan.md にこの計画を追記 — risk: safe（このエントリ）
+- task-202: ids.js（GOLD=45, KINTSUGI=46）+ meta.js（GOLD_COLS/KINTSUGI_COLS、CONDUCTOR_IDS に KINTSUGI 追加）
+  - verification: node --check 通過、CONDUCTOR_IDS.length === 8（3bit 上限内）— risk: safe
+- task-203: src/materials/kintsugi.js 新規（updateGold / updateKintsugi、kintsugi_formed 発火）— risk: safe
+- task-204: electricity.js の _vibRestore に金継ぎ通過キラめき（SPARK、破壊なし）— risk: safe
+- task-205: registry.js + materials.js ファサード + main.js PALETTE 配線 — risk: safe
+- task-206: sakura.js 開花境界に sakura_bloomed、life.js 蛍発生に firefly_born — risk: safe
+- task-207: scenarios.js — TRIGGERS/MATERIAL_TRIGGER_MAP 追加、loadKintsugi / loadSakuraFirefly レイアウト、SCENARIOS 2件
+  - verification: Node でロード→PNG 目視 — risk: safe
+- task-208: docs/keyboard-mode-design.md の電気グループ表更新（金属・雷・金 = 3個）— risk: safe
+- task-209: Node 検証スイート — 金の流動/凝固/イベント、酸耐性（骨格残存）、溶岩再溶解、振動波の通過と復元、
+  桜シナリオ長回しで sakura_bloomed / firefly_born 発火確認 — risk: safe
+- task-210: 両シナリオの盤面 PNG 目視 — risk: safe
+- task-211: コミット — risk: requires-approval
 
 ---
 

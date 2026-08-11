@@ -5,10 +5,11 @@ import { EMPTY, SAND, WATER, WALL, SNOW, FIRE, OIL, LAVA, COAL,
          SOIL, SEED, FUNGUS, METAL, LIGHTNING,
          STEAM, ACID, MUD, ICE, HARD_SOIL,
          ACID_PLANT, OBSIDIAN, SANDSTONE, BASALT, SPRING, LAVA_SPRING,
-         SAKURA_SEED, SAKURA_PETAL, FIREFLY, POLLEN, MA_VOID, KOI } from './materials.js';
+         SAKURA_SEED, SAKURA_PETAL, FIREFLY, POLLEN, MA_VOID, KOI, GOLD } from './materials.js';
 import { SCENARIOS, MATERIAL_TRIGGER_MAP } from './scenarios.js';
-import { ZenAudio }    from './audio.js';
-import { ChiriRitual } from './ritual.js';
+import { ZenAudio }     from './audio.js';
+import { ChiriRitual }  from './ritual.js';
+import { PracticeMode } from './practice.js';
 
 const CELL_SIZE = 4;
 
@@ -49,6 +50,7 @@ const PALETTE = [
   // 電気
   { id: METAL,     label: '金属', color: '#B0B8C8', key: 'r', group: '電気' },
   { id: LIGHTNING, label: '雷',   color: '#EEEEFF', key: 't', group: '電気' },
+  { id: GOLD,      label: '金',   color: '#FFC63A', key: 'n', group: '電気' },
   // 侘寂
   { id: SAKURA_SEED,  label: '桜種',  color: '#C0784E', key: 'j', group: '侘寂' },
   { id: SAKURA_PETAL, label: '花びら', color: '#FFB7C5', key: 'k', group: '侘寂' },
@@ -173,6 +175,7 @@ function init() {
   }
 
   function loadScenario(scenario) {
+    practice.stop(); // 実験帳とシナリオは排他
     activeScenario = scenario;
     currentAct     = 0;
     input.resetUsage();
@@ -204,6 +207,37 @@ function init() {
       updateScenarioBar();
     }
   }
+
+  // ── 実験帳（化学反応の練習モード）────────────────────────────────────────
+  const practice = new PracticeMode(engine, {
+    onBar: text => {
+      if (text === null) {
+        if (!activeScenario) scenarioBar.classList.remove('show');
+        return;
+      }
+      scenarioBar.textContent = text;
+      scenarioBar.classList.add('show');
+    },
+    onState: state => {
+      if (state === 'ready') {
+        practiceBtn.textContent = '次へ ➜';
+        practiceBtn.title = '次の実験へ進む';
+        practiceBtn.classList.add('practice-next');
+      } else if (state === 'trying') {
+        practiceBtn.textContent = '⏭';
+        practiceBtn.title = '実験帳 — このお題をスキップ';
+        practiceBtn.classList.remove('practice-next');
+      } else {
+        practiceBtn.textContent = '🧪';
+        practiceBtn.title = '実験帳 — 化学反応の練習';
+        practiceBtn.classList.remove('practice-next');
+      }
+    },
+    onSuccess: () => audio.bell(),
+    onFinish:  () => setTimeout(() => {
+      if (!practice.active && !activeScenario) scenarioBar.classList.remove('show');
+    }, 4000),
+  });
 
   // ── Scenario modal ────────────────────────────────────────────────────────
   function openModal() {
@@ -335,6 +369,19 @@ function init() {
     .addEventListener('click', () => setBrush(input.brushRadius + 1));
   setBrush(input.brushRadius);
 
+  // ── UI: 実験帳 ───────────────────────────────────────────────────────────
+  const practiceBtn = document.getElementById('practice-btn');
+  practiceBtn.addEventListener('click', () => {
+    audio.ensure();
+    if (!practice.active) {
+      activeScenario = null;
+      practice.start();
+      showHint('実験帳 — ⏭でスキップ、成功後は「次へ」、クリアで退出');
+    } else {
+      practice.skip();
+    }
+  });
+
   // ── UI: rain toggle ───────────────────────────────────────────────────────
   const rainBtn = document.getElementById('rain-btn');
   rainBtn.addEventListener('click', () => {
@@ -364,6 +411,7 @@ function init() {
 
   // ── UI: clear ────────────────────────────────────────────────────────────
   document.getElementById('clear-btn').addEventListener('click', () => {
+    practice.stop();
     engine.clear();
     activeScenario = null;
     updateScenarioBar();
@@ -381,6 +429,7 @@ function init() {
       audio.bell();
       showHint('無');
     }
+    practice.step();
     // 水の在否を毎秒まばらに標本調査（環境音の雫用）
     if (++frame % 60 === 0) {
       waterPresent = false;
