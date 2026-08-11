@@ -1,4 +1,4 @@
-// 実験帳の機械プレイ検証: 全10題を正答ボットでプレイして完走できることを確認し、
+// 実験帳の機械プレイ検証: 全題を正答ボットでプレイして完走できることを確認し、
 // 各舞台を60フレーム流した状態の PNG を tests/out/ に出力する。
 //
 // 実行手順（docs/practice-drill-guide.md §6）:
@@ -13,7 +13,7 @@ import { Engine } from '../src/engine.js';
 import { PracticeMode, DRILLS, stageFrame } from '../src/practice.js';
 import * as ids from '../src/materials/ids.js';
 
-const { EMPTY, FIRE, WATER, LIGHTNING, LAVA, SEED, GOLD, SNOW } = ids;
+const { EMPTY, FIRE, WATER, LIGHTNING, LAVA, OIL, SEED, GOLD, SNOW } = ids;
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'out');
 mkdirSync(OUT, { recursive: true });
@@ -77,12 +77,19 @@ const { W, H, cx } = stageFrame(engine);
 
 const ANSWERS = {
   wildfire: f => { if (f % 15 === 0) engine.set(1 + ((f * 7) % (W - 2)), H - 5, FIRE); },
+  oilfield: f => { if (f % 18 === 0) engine.set(25 + ((f * 11) % (W - 50)), H - 25, LIGHTNING); },
   steam:    f => { if (f % 3 === 0)  engine.set(cx + ((f * 5) % 57) - 28, H - 3, FIRE); },
   stone:    f => { if (f % 2 === 0)  engine.set(5 + ((f * 3) % 90), 30, WATER); },
   glass:    f => { if (f % 12 === 0) engine.set([40, 90, 140, 176][(f / 12) % 4 | 0], 30, LIGHTNING); },
+  sandstone:f => { if (f % 2 === 0)  engine.set(25 + ((f * 7) % (W - 50)), H - 35, LAVA); },
   obsidian: f => { if (f % 3 === 0)  engine.set(cx + ((f * 3) % 29) - 14, 60, SNOW); },
   basalt:   f => { if (f % 3 === 0)  engine.set(24 + ((f * 5) % 64), H - 8, LAVA); },
+  'glow-cave': f => { if (f % 2 === 0) engine.set(20 + ((f * 7) % (W - 40)), H - 22, OIL); },
   sprout:   f => { if (f % 20 === 0) engine.set(10 + (f % 120), H - 10, SEED); },
+  'sumi-night': f => {
+    if (f < 240 && f % 2 === 0) engine.set(20 + ((f * 5) % (W - 40)), H - 35, WATER);
+    if (f >= 180 && f % 8 === 0) engine.set(20 + ((f * 11) % (W - 40)), H - 30, SEED);
+  },
   freeze:   f => { if (f % 2 === 0)  engine.set(cx + ((f * 5) % 99) - 49, H - 8, SNOW); },
   spark:    f => { if (f % 10 === 0) engine.set(20 + ((f * 7) % 160), H - 10, LIGHTNING); },
   kintsugi: f => { if (f % 4 === 0)  engine.set(cx + (f % 2), H - 21, GOLD); },
@@ -101,12 +108,18 @@ p.start();
 const DRILL_LIMIT = 8000; // 1題あたりの上限（約2分強@60fps）
 const stalled = [];
 const perDrill = [];
-let drillFrames = 0, lastIndex = 0;
+let drillFrames = 0, readyFrames = 0, lastIndex = 0;
 while (p.active) {
   if (p.state === 'trying') ANSWERS[DRILLS[p.index].id]?.(drillFrames);
   engine.update();
   p.step();
   drillFrames++;
+  if (p.state === 'ready') {
+    // 成功後も180フレームは反応を続け、プレイヤーの「次へ」を模した操作で進む
+    if (++readyFrames >= 180) { p.skip(); readyFrames = 0; }
+  } else {
+    readyFrames = 0;
+  }
   if (p.index !== lastIndex) {
     perDrill.push(`${DRILLS[lastIndex].id}: ${drillFrames}f`);
     lastIndex = p.index; drillFrames = 0;
@@ -125,13 +138,25 @@ function check(name, cond, detail = '') {
 }
 
 console.log('所要フレーム:', perDrill.join(', '));
-check('全10題が制限時間内に達成可能', stalled.length === 0, `stalled=[${stalled}]`);
+check('全題が制限時間内に達成可能', stalled.length === 0, `stalled=[${stalled}]`);
 check('完走してモード終了', !p.active && p.index === DRILLS.length, `index=${p.index}`);
-check('おりんが10回鳴った', bells === 10, `bells=${bells}`);
+check('おりんが各題で鳴った', bells === DRILLS.length, `bells=${bells}`);
 check('皆伝メッセージ表示', barLog.some(t => typeof t === 'string' && t.includes('皆伝')));
 check('各題のヒントが表示された',
   DRILLS.every(d => barLog.some(t => typeof t === 'string' && t.includes(`「${d.title}」 — `))));
-check('成功メッセージが10回', barLog.filter(t => typeof t === 'string' && t.startsWith('⭕')).length === 10);
+check('成功メッセージが各題に出た',
+  barLog.filter(t => typeof t === 'string' && t.startsWith('⭕')).length === DRILLS.length);
+
+const manualEngine = new Engine(200, 140);
+const manualPractice = new PracticeMode(manualEngine);
+manualPractice.start();
+for (let x = 0; x < 12; x++) manualEngine.set(x, 100, FIRE);
+manualPractice.step();
+for (let f = 0; f < 240; f++) { manualEngine.update(); manualPractice.step(); }
+check('成功後は自動で次の実験へ進まない',
+  manualPractice.active && manualPractice.index === 0 && manualPractice.state === 'ready');
+manualPractice.skip();
+check('次へ操作で次の実験へ進む', manualPractice.index === 1 && manualPractice.state === 'trying');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

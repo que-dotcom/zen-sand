@@ -212,6 +212,21 @@ function init() {
       scenarioBar.textContent = text;
       scenarioBar.classList.add('show');
     },
+    onState: state => {
+      if (state === 'ready') {
+        practiceBtn.textContent = '次へ ➜';
+        practiceBtn.title = '次の実験へ進む';
+        practiceBtn.classList.add('practice-next');
+      } else if (state === 'trying') {
+        practiceBtn.textContent = '⏭';
+        practiceBtn.title = '実験帳 — このお題をスキップ';
+        practiceBtn.classList.remove('practice-next');
+      } else {
+        practiceBtn.textContent = '🧪';
+        practiceBtn.title = '実験帳 — 化学反応の練習';
+        practiceBtn.classList.remove('practice-next');
+      }
+    },
     onSuccess: () => audio.bell(),
     onFinish:  () => setTimeout(() => {
       if (!practice.active && !activeScenario) scenarioBar.classList.remove('show');
@@ -317,7 +332,7 @@ function init() {
     if (!practice.active) {
       activeScenario = null;
       practice.start();
-      showHint('実験帳 — 🧪でスキップ、クリアで退出');
+      showHint('実験帳 — ⏭でスキップ、成功後は「次へ」、クリアで退出');
     } else {
       practice.skip();
     }

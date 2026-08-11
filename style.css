@@ -152,6 +152,12 @@ body {
   background: rgba(255, 255, 255, 0.07);
 }
 
+.icon-btn.practice-next {
+  border-color: rgba(255, 210, 92, 0.75);
+  color: #ffe6a1;
+  background: rgba(255, 190, 56, 0.14);
+}
+
 #clear-btn {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.15);

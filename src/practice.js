@@ -1,7 +1,7 @@
 import {
-  EMPTY, STONE, SAND, WATER, LAVA, SOIL, MUD, GLASS,
-  OBSIDIAN, BASALT, STEAM, FIRE, PLANT, FLOWER, SPARK, KINTSUGI,
-  ICE, LAVA_SPRING, HARD_SOIL,
+  EMPTY, STONE, SAND, WATER, LAVA, OIL, COAL, SOIL, MUD, GLASS,
+  OBSIDIAN, SANDSTONE, BASALT, STEAM, FIRE, PLANT, DARK_PLANT, FLOWER, SPARK, KINTSUGI,
+  FUNGUS, GLOW_FUNGUS, ICE, LAVA_SPRING, HARD_SOIL,
 } from './materials.js';
 
 // ─── 実験帳 (Practice Mode) ──────────────────────────────────────────────────
@@ -43,7 +43,7 @@ export function stageFrame(engine) {
   };
 }
 
-// ─── お題10題 ────────────────────────────────────────────────────────────────
+// ─── お題13題 ────────────────────────────────────────────────────────────────
 // products: 数える生成物 / goal: 成功に必要な増分（ベースライン比）
 
 export const DRILLS = [
@@ -59,6 +59,22 @@ export const DRILLS = [
         const h = 2 + Math.floor(Math.random() * 4);
         for (let dy = 1; dy <= h; dy++) set(e, x, H - 3 - dy, PLANT);
         if (Math.random() > 0.75) set(e, x, H - 4 - h, FLOWER);
+      }
+    },
+  },
+  {
+    id: 'oilfield', title: '油田の雷鳴', goal: 30, products: [FIRE],
+    hint: '黒い油田に、雷 [t] を落とそう',
+    done: '稲妻は油田を、炎の海へ変えた',
+    setup(e) {
+      const { W, H } = stageFrame(e);
+      fillRect(e, 0, H - 3, W - 1, H - 1, STONE);
+      const left = Math.floor(W * 0.09), right = Math.floor(W * 0.91);
+      fillRect(e, left, H - Math.max(15, Math.floor(H * 0.13)), right, H - 4, OIL);
+      mound(e, Math.floor(W * 0.08), H - 4, Math.max(10, Math.floor(H * 0.16)), STONE);
+      mound(e, Math.floor(W * 0.92), H - 4, Math.max(10, Math.floor(H * 0.17)), STONE);
+      for (let x = Math.floor(W * 0.22); x < right; x += Math.max(12, Math.floor(W * 0.16))) {
+        fillRect(e, x, H - Math.max(19, Math.floor(H * 0.18)), x + 1, H - 4, STONE);
       }
     },
   },
@@ -112,6 +128,20 @@ export const DRILLS = [
     },
   },
   {
+    id: 'sandstone', title: '砂の炉', goal: 10, products: [SANDSTONE],
+    hint: '砂丘の上から、溶岩 [6] を流そう',
+    done: '砂は焼き締まり、金色の岩肌になった',
+    setup(e) {
+      const { W, H } = stageFrame(e);
+      fillRect(e, 0, H - 3, W - 1, H - 1, STONE);
+      fillRect(e, Math.floor(W * 0.07), H - Math.max(18, Math.floor(H * 0.16)),
+        Math.floor(W * 0.93), H - 4, SAND);
+      mound(e, Math.floor(W * 0.24), H - 4, Math.max(11, Math.floor(H * 0.16)), SAND);
+      mound(e, Math.floor(W * 0.60), H - 4, Math.max(16, Math.floor(H * 0.23)), SAND);
+      mound(e, Math.floor(W * 0.86), H - 4, Math.max(9, Math.floor(H * 0.13)), SAND);
+    },
+  },
+  {
     id: 'obsidian', title: '火口', goal: 8, products: [OBSIDIAN],
     hint: '火口に、雪 [3] を降らせよう',
     done: '火口は、漆黒の鏡石で蓋をされた',
@@ -148,6 +178,28 @@ export const DRILLS = [
     },
   },
   {
+    id: 'glow-cave', title: '夜光洞', goal: 12, products: [GLOW_FUNGUS],
+    hint: '洞の菌床に、油 [5] を注ごう',
+    done: '菌床は青緑の灯りを宿した',
+    setup(e) {
+      const { W, H } = stageFrame(e);
+      fillRect(e, 0, H - 3, W - 1, H - 1, STONE);
+      const wallW = Math.max(8, Math.floor(W * 0.10));
+      fillRect(e, 0, H - Math.max(34, Math.floor(H * 0.32)), wallW, H - 4, STONE);
+      fillRect(e, W - 1 - wallW, H - Math.max(36, Math.floor(H * 0.34)), W - 1, H - 4, STONE);
+      for (let x = wallW + 10; x < W - wallW - 10; x += Math.max(24, Math.floor(W * 0.18))) {
+        const h = 8 + ((x * 5) % 12);
+        fillRect(e, x, 0, x + 2, h, STONE); // 天井の鍾乳石。間から油を落とせる
+      }
+      for (let x = wallW + 8; x < W - wallW - 8; x += Math.max(18, Math.floor(W * 0.13))) {
+        const h = 7 + ((x * 7) % 10);
+        fillRect(e, x, H - 4 - h, x + 2, H - 4, STONE);
+      }
+      for (let x = wallW + 3; x < W - wallW - 3; x += 3) set(e, x, H - 4, FUNGUS);
+      for (let x = wallW + 12; x < W - wallW - 12; x += 6) set(e, x, H - 12, FUNGUS);
+    },
+  },
+  {
     id: 'sprout', title: '畑', goal: 3, products: [PLANT, FLOWER],
     hint: '畝に、種 [w] を蒔こう',
     done: '畑に、緑が目を覚ます',
@@ -159,6 +211,28 @@ export const DRILLS = [
       fillRect(e, pL, H - 6, pL, H - 1, STONE);   // 石張りの水瓶
       fillRect(e, pR, H - 6, pR, H - 1, STONE);
       fillRect(e, pL + 1, H - 5, pR - 1, H - 2, WATER);
+    },
+  },
+  {
+    id: 'sumi-night', title: '墨田の夜', goal: 8, products: [DARK_PLANT],
+    hint: '① 画面下の黒い炭田へ、水 [2] を流して墨泥を作ろう',
+    instructions: [
+      { products: [MUD], goal: 10, hint: '② できた黒い墨泥の上へ、種 [w] を蒔こう' },
+    ],
+    done: '墨の泥から、夜色の草が伸びた',
+    setup(e) {
+      const { W, H } = stageFrame(e);
+      fillRect(e, 0, H - 3, W - 1, H - 1, STONE);
+      const left = Math.floor(W * 0.08), right = Math.floor(W * 0.92);
+      const bankTop = H - Math.max(18, Math.floor(H * 0.16));
+      fillRect(e, 0, bankTop, left - 1, H - 4, HARD_SOIL);
+      fillRect(e, right + 1, bankTop, W - 1, H - 4, HARD_SOIL);
+      fillRect(e, left, H - Math.max(12, Math.floor(H * 0.12)), right, H - 4, COAL);
+      for (let x = left; x <= right; x += Math.max(16, Math.floor(W * 0.15))) {
+        fillRect(e, x, H - Math.max(17, Math.floor(H * 0.16)), x + 1, H - 6, STONE);
+      }
+      mound(e, Math.floor(W * 0.13), H - 4, Math.max(8, Math.floor(H * 0.11)), STONE);
+      mound(e, Math.floor(W * 0.87), H - 4, Math.max(9, Math.floor(H * 0.12)), STONE);
     },
   },
   {
@@ -218,18 +292,17 @@ export const DRILLS = [
 
 // ─── モード制御 ──────────────────────────────────────────────────────────────
 
-const CELEBRATE_FRAMES = 130; // 成功表示の余韻（約2秒 @ 60fps）
-
 export class PracticeMode {
-  // hooks: { onBar(text|null), onSuccess(), onFinish() } — DOM や音の配線は呼び出し側が持つ
+  // hooks: { onBar(text|null), onState(state), onSuccess(), onFinish() } — DOM や音の配線は呼び出し側が持つ
   constructor(engine, hooks = {}) {
     this.engine   = engine;
     this.hooks    = hooks;
     this.active   = false;
     this.index    = 0;
-    this.state    = 'idle'; // 'trying' | 'celebrate'
+    this.state    = 'idle'; // 'trying' | 'ready'（成功後、次へを待つ）
     this.baseline = 0;
-    this.wait     = 0;
+    this.instructionIndex = 0;
+    this.instructionBaselines = [];
   }
 
   start() {
@@ -242,6 +315,7 @@ export class PracticeMode {
     this.active = false;
     this.state  = 'idle';
     this.hooks.onBar?.(null);
+    this.hooks.onState?.('idle');
   }
 
   skip() {
@@ -251,15 +325,21 @@ export class PracticeMode {
 
   step() {
     if (!this.active) return;
-    if (this.state === 'celebrate') {
-      if (--this.wait <= 0) this._next();
+    if (this.state === 'ready') return; // 反応を眺め、プレイヤーの「次へ」を待つ
+    const d = DRILLS[this.index];
+    const instruction = d.instructions?.[this.instructionIndex];
+    if (instruction) {
+      const baseline = this.instructionBaselines[this.instructionIndex];
+      if (this._count(instruction.products) - baseline >= instruction.goal) {
+        this.instructionIndex++;
+        this.hooks.onBar?.(`実験 ${this.index + 1}/${DRILLS.length} 「${d.title}」 — ${instruction.hint}`);
+      }
       return;
     }
-    const d = DRILLS[this.index];
     if (this._count(d.products) - this.baseline >= d.goal) {
-      this.state = 'celebrate';
-      this.wait  = CELEBRATE_FRAMES;
-      this.hooks.onBar?.(`⭕ 「${d.title}」成功 —— ${d.done}`);
+      this.state = 'ready';
+      this.hooks.onBar?.(`⭕ 「${d.title}」成功 —— ${d.done}　🧪の「次へ」を押すまで、反応を眺められます`);
+      this.hooks.onState?.('ready');
       this.hooks.onSuccess?.();
     }
   }
@@ -269,7 +349,10 @@ export class PracticeMode {
     this.engine.clear();
     d.setup(this.engine);
     this.baseline = this._count(d.products);
+    this.instructionIndex = 0;
+    this.instructionBaselines = (d.instructions ?? []).map(instruction => this._count(instruction.products));
     this.state    = 'trying';
+    this.hooks.onState?.('trying');
     this.hooks.onBar?.(`実験 ${this.index + 1}/${DRILLS.length} 「${d.title}」 — ${d.hint}`);
   }
 
@@ -278,6 +361,7 @@ export class PracticeMode {
     if (this.index >= DRILLS.length) {
       this.active = false;
       this.state  = 'idle';
+      this.hooks.onState?.('idle');
       this.hooks.onBar?.('—— 実験帳、皆伝。庭は自由に ——');
       this.hooks.onFinish?.();
       return;
