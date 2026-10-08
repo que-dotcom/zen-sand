@@ -33,8 +33,8 @@ function props(ids, { cond, air, init, fixed, cap }) {
 props([METAL],                    { cond: 0.22, air: 0.005 });
 props([GOLD, KINTSUGI],           { cond: 0.20, air: 0.004 });
 props([WATER],                    { cond: 0.15, air: 0.004, cap: 2.5 });
-props([ICE],                      { cond: 0.12, air: 0.0003, init: 50, cap: 6 });
-props([SNOW],                     { cond: 0.01, air: 0.0003, init: 55, cap: 4 });
+props([ICE],                      { cond: 0.012, air: 0.006, init: T_FREEZE - 8, cap: 20 }); // 熱を通しにくいので、温まった表面から順に融ける
+props([SNOW],                     { cond: 0.004, air: 0.004, init: T_FREEZE - 6, cap: 24 }); // 断熱性が高く融けにくい
 props([LAVA],                     { cond: 0.003, air: 0.0002, init: T_LAVA, cap: 8 });
 props([LAVA_SPRING],              { cond: 0.003, init: T_LAVA, fixed: true });
 props([FIRE],                     { cond: 0.10, init: T_FIRE, fixed: true });
@@ -112,6 +112,28 @@ export function steamExplosion(engine, wx, wy) {
   engine.fireEvent('steam_explosion');
 }
 
+// ─── 融解の潜熱 ───────────────────────────────────────────────────────────────
+// 氷・雪は氷点（T_FREEZE）を超えても、すぐには融けない。氷点より上の熱は融解に使われ（温度は氷点に留まる）、
+// 潜熱 LATENT_FUSION（温度に換算した度数）ぶん熱を受けて初めて水になる。進み具合は engine.meta（0〜255）に持つ。
+// 熱を通しにくい氷では、熱を受けた表面のセルから順に融け、内側は冷たいまま残る。氷点を下回ると進みは戻る（凍り直す）。
+const LATENT_FUSION = 12;
+const FUSION_RATE = 255 / LATENT_FUSION; // 氷点との差 1 度ぶんの熱で進む量
+const MELT_TINT = [0x3A, 0x6E, 0xA8];    // 融けかけの氷が寄っていく色（水色がかった暗い色）
+
+function meltTint(i, type, progress) {
+  const cols = MATERIALS[type].colors;
+  const base = cols[(i * 2654435761 >>> 0) % cols.length];
+  const f = Math.min(1, progress / 255) * 0.75;
+  const ch = (shift, k) => Math.round(((base >> shift) & 0xFF) * (1 - f) + MELT_TINT[k] * f);
+  return (ch(16, 0) << 16) | (ch(8, 1) << 8) | ch(0, 2);
+}
+
+// 小数の進みを Uint8 の meta に確率的に丸めて保存する（小さな増分が 0 に切り捨てられないように）
+function storeProgress(engine, i, v) {
+  const lo = Math.floor(v);
+  engine.meta[i] = lo + (Math.random() < v - lo ? 1 : 0);
+}
+
 // ─── 溶岩の色 ─────────────────────────────────────────────────────────────────
 // 温度が下がるほど暗い赤茶に寄る（固まる直前が最も暗い）。基準色はセル位置から決める（ちらつき防止）。
 const LAVA_COOL_COLOR = [0x4A, 0x1A, 0x0C];
@@ -174,15 +196,31 @@ export function thermalStep(engine) {
       switch (type) {
         case WATER:
           if (t >= T_BOIL) { steamExplosion(engine, x, y); }
-          else if (t <= T_FREEZE) { engine.set(x, y, ICE); T[i] = t; }
+          else if (t <= T_FREEZE) { engine.set(x, y, ICE); T[i] = t; engine.meta[i] = 0; }
           break;
         case ICE:
-        case SNOW:
-          if (t >= T_ICE_MELT && Math.random() < (type === ICE ? 0.2 : 0.15)) {
-            engine.set(x, y, WATER);
-            T[i] = T_FREEZE + 6; // 融解の潜熱: 融けたての水は冷たい
+        case SNOW: {
+          const progress = engine.meta[i];
+          if (t > T_ICE_MELT) {
+            // 氷点より上の熱は融解に使われ、温度は氷点に留まる
+            const next = progress + (t - T_ICE_MELT) * FUSION_RATE;
+            T[i] = T_ICE_MELT;
+            if (next >= 255) {
+              engine.set(x, y, WATER);
+              T[i] = T_FREEZE + 6; // 融けたての水は冷たい
+              engine.meta[i] = 0;
+            } else {
+              storeProgress(engine, i, next);
+              engine.colors[i] = meltTint(i, type, next);
+            }
+          } else if (progress > 0 && t < T_FREEZE) {
+            // 氷点を下回ると、融けかけが凍り直す
+            const next = Math.max(0, progress - (T_FREEZE - t) * FUSION_RATE);
+            storeProgress(engine, i, next);
+            engine.colors[i] = meltTint(i, type, next);
           }
           break;
+        }
         case LAVA:
           if (t <= T_LAVA_SOLID) { engine.set(x, y, STONE); T[i] = t; }
           else engine.colors[i] = lavaColor(i, t);

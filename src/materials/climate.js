@@ -4,7 +4,7 @@
 // 気温は高度で下がる（高いほど冷たい）。上空ほど水蒸気が露点に達しやすくなる。
 
 export const T_FREEZE   = 80;   // これ以下の水は氷になる
-export const T_ICE_MELT = 92;   // これ以上の氷・雪は融ける
+export const T_ICE_MELT = T_FREEZE; // 氷・雪はこれを超えると融けはじめる（融けきるには潜熱の分だけ熱が要る。thermal.js）
 export const T_DEW      = 96;   // これを下回った水蒸気は凝結して雲になる
 export const T_BOIL     = 150;  // これ以上の水は沸騰して蒸気になる
 

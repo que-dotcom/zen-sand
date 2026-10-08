@@ -2,7 +2,7 @@
 import { Engine } from '../src/engine.js';
 import * as ids from '../src/materials/ids.js';
 import {
-  T_FREEZE, T_BOIL, T_LAVA, T_LAVA_SOLID, T_AMBIENT_GROUND, T_AMBIENT_TOP,
+  T_FREEZE, T_ICE_MELT, T_BOIL, T_LAVA, T_LAVA_SOLID, T_AMBIENT_GROUND, T_AMBIENT_TOP,
 } from '../src/materials/climate.js';
 
 let passed = 0, failed = 0;
@@ -77,6 +77,56 @@ const run = (e, n) => { for (let f = 0; f < n; f++) e.update(); };
   for (let i = 0; i < e.cells.length; i++) if (e.cells[i] === ids.SNOW) e.temp[i] = T_AMBIENT_GROUND + 10;
   run(e, 30);
   check('暖まった雪は融ける', count(e, ids.SNOW) === 0);
+}
+
+// 6b. 氷・雪の初期温度は氷点のすぐ下（冷たすぎない）。氷点を超えたら融け、暖かい空気ではやがて融ける
+{
+  const e = box();
+  e.set(40, H - 2 - 1, ids.ICE);
+  const t0 = e.temp[e.idx(40, H - 2 - 1)];
+  check('氷は氷点のすぐ下の温度で置かれる', t0 < T_FREEZE && t0 >= T_FREEZE - 12, `t0=${t0}`);
+  const s = box(); s.set(40, 90, ids.SNOW);
+  const ts = s.temp[s.idx(40, 90)];
+  check('雪も氷点のすぐ下の温度で置かれる', ts < T_FREEZE && ts >= T_FREEZE - 12, `ts=${ts}`);
+
+  const h = box();
+  h.set(40, H - 2 - 1, ids.ICE);
+  let melted = -1;
+  for (let f = 0; f < 3000 && melted < 0; f++) { h.update(); if (count(h, ids.ICE) === 0) melted = f; }
+  check('暖かい地表の氷は、放っておけばやがて融ける', melted >= 0, `ice=${count(h, ids.ICE)} after 3000f`);
+}
+
+// 6c. 融解には潜熱がいる: 氷点を超えても一瞬では融けず、熱を受けた端から順に融ける
+{
+  const e = box();
+  const y = H - 2;
+  for (let x = 10; x < 20; x++) e.set(x, y, ids.ICE);
+  // 左端の壁（x=9）を熱源にして、左から右へ熱を流す
+  e.set(9, y, ids.WALL);
+  let firstGone = -1, order = [];
+  let stillIceAtFirstMelt = 0, allGone = -1;
+  for (let f = 0; f < 6000 && allGone < 0; f++) {
+    e.temp[e.idx(9, y)] = 130;
+    e.update();
+    const iceX = [];
+    for (let x = 10; x < 20; x++) if (e.get(x, y) === ids.ICE) iceX.push(x);
+    if (firstGone < 0 && iceX.length < 10) { firstGone = f; stillIceAtFirstMelt = iceX.length; }
+    if (iceX.length === 0) allGone = f;
+  }
+  check('氷点を超えても一斉には融けない（はじめの 1 セルが融けた時点で残りはまだ氷）', firstGone >= 0 && stillIceAtFirstMelt >= 5, `firstGone=${firstGone} remaining=${stillIceAtFirstMelt}`);
+  check('熱源から遠い氷ほど遅れて融ける（全部融けるまでに時間差がある）', allGone > firstGone + 200, `first=${firstGone} all=${allGone}`);
+}
+
+// 6d. 氷点を超えた氷の温度は氷点に留まる（熱は融解に使われる）
+{
+  const e = box();
+  e.set(40, H - 2 - 1, ids.ICE);
+  let maxT = 0;
+  for (let f = 0; f < 600; f++) {
+    e.update();
+    for (let i = 0; i < e.cells.length; i++) if (e.cells[i] === ids.ICE) maxT = Math.max(maxT, e.temp[i]);
+  }
+  check('氷の温度は氷点を超えない', maxT <= T_FREEZE + 0.5, `maxT=${maxT.toFixed(1)}`);
 }
 
 // 7. 高温の岩は溶岩になり、冷えた溶岩は石に固まる
