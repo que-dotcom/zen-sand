@@ -10,6 +10,7 @@ import { SCENARIOS, MATERIAL_TRIGGER_MAP } from './scenarios.js';
 import { ZenAudio }     from './audio.js';
 import { ChiriRitual }  from './ritual.js';
 import { DRILLS, PracticeMode } from './practice.js';
+import { SpeedGovernor } from './speed.js';
 
 function rubyHTML(s) {
   return s.replace(/([一-龠々〆〤ヶ]+)\{([^}]+)\}/g, '<ruby>$1<rt>$2</rt></ruby>');
@@ -516,10 +517,38 @@ function init() {
     updateScenarioBar();
   });
 
+  // ── UI: 倍速 ─────────────────────────────────────────────────────────────
+  // 上限は SpeedGovernor が実測から動的に決める（表示 60fps を保てる範囲）。
+  const governor = new SpeedGovernor();
+  const speedBtn = document.getElementById('speed-btn');
+  function updateSpeedBtn() {
+    speedBtn.textContent = `${governor.speed}×`;
+    speedBtn.classList.toggle('active', governor.speed > 1);
+    speedBtn.title = governor.calibrated
+      ? `倍速（今の上限 ${governor.maxSpeed(performance.now())}×）`
+      : '倍速（性能を測定中）';
+  }
+  speedBtn.addEventListener('click', () => {
+    const now = performance.now();
+    governor.cycle(now);
+    updateSpeedBtn();
+    showHint(!governor.calibrated
+      ? '性能を測定中… しばらくしてからもう一度'
+      : `${governor.speed}× — 上限 ${governor.maxSpeed(now)}×（この端末で 60fps を保てる範囲）`);
+  });
+  updateSpeedBtn();
+
   // ── Game loop ─────────────────────────────────────────────────────────────
+  // 描画は rAF ごと、シミュレーションは「60 ステップ/秒 × 倍速」を時間で積算して回す。
+  // 1フレームに回すステップ数は倍速の 2 倍までに抑え、遅れを取り戻そうとして暴走しない。
+  const STEP_MS = 1000 / 60;
   let frame = 0;
   let waterPresent = false;
-  function loop() {
+  let lastTime = performance.now();
+  let acc = 0;
+  let renderCount = 0;
+
+  function stepSimulation() {
     spawner.update();
     engine.update();
     if (ritual.step() === 'done') {
@@ -539,9 +568,33 @@ function init() {
         }
       }
     }
+  }
+
+  function loop(timeStamp) {
+    const now = performance.now();
+    const interval = timeStamp - lastTime;
+    lastTime = timeStamp;
+    let lowered = governor.recordFrameInterval(interval, now);
+
+    acc += Math.min(interval, 100) / STEP_MS * governor.speed;
+    const steps = Math.min(Math.floor(acc), governor.speed * 2);
+    acc = Math.min(acc - steps, 1);
+
+    const t0 = performance.now();
+    for (let i = 0; i < steps; i++) stepSimulation();
+    const t1 = performance.now();
     audio.ambientTick(waterPresent);
     renderer.render();
     checkActProgress();
+    const t2 = performance.now();
+
+    lowered = governor.recordWork(t1 - t0, steps, t2 - t1, t2) || lowered;
+    if (lowered) {
+      updateSpeedBtn();
+      showHint(`${governor.speed}× に下げました — 60fps を保てる上限です`);
+    } else if (++renderCount % 30 === 0) {
+      updateSpeedBtn(); // 較正完了・上限の変化をツールチップに反映
+    }
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
