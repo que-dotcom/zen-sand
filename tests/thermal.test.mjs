@@ -50,6 +50,53 @@ const run = (e, n) => { for (let f = 0; f < n; f++) e.update(); };
   check('熱源から離れた金属も気温より温まる', metal > 10, `metal=${metal.toFixed(1)}`);
 }
 
+// 3b. 画面の外側とは熱をやり取りしない（断熱）
+{
+  // 全面を石で埋めた閉じた系: 外へ熱が逃げず、外から入ってもこないので、総熱量（温度×熱容量）が保存される
+  const e = new Engine(40, 30);
+  for (let i = 0; i < e.cells.length; i++) { e.cells[i] = ids.STONE; e.colors[i] = 0x808080; }
+  for (let i = 0; i < e.cells.length; i++) e.temp[i] = 150;
+  const total = () => { let s = 0; for (const t of e.temp) s += t; return s; };
+  const t0 = total();
+  run(e, 300);
+  check('全面を埋めると端から熱が逃げない（気温より高くても温度が変わらない）', Math.abs(total() - t0) / t0 < 1e-4, `${t0.toFixed(1)} -> ${total().toFixed(1)}`);
+
+  // 熱いセルが四隅・辺にあっても、外へ熱を捨てない（内側の隣とだけ熱を交換する）
+  const c = new Engine(20, 20);
+  for (let i = 0; i < c.cells.length; i++) { c.cells[i] = ids.STONE; c.colors[i] = 0x808080; c.temp[i] = 100; }
+  c.temp[c.idx(0, 0)] = 200; c.temp[c.idx(19, 10)] = 200;
+  const sum = () => { let s = 0; for (const t of c.temp) s += t; return s; };
+  const s0 = sum();
+  run(c, 200);
+  check('端の熱源の熱は系の内側にとどまる', Math.abs(sum() - s0) / s0 < 1e-4, `${s0.toFixed(1)} -> ${sum().toFixed(1)}`);
+}
+
+// 3c. 環境の気温（設定のスライダー）: 全体を上下にずらす。高度による下がり方は変わらない
+{
+  const e = box();
+  const g0 = e.ambientAt(H - 2), t0 = e.ambientAt(0);
+  e.setAmbientShift(30);
+  check('気温を上げると地表も上空も同じだけ上がる', Math.abs(e.ambientAt(H - 2) - g0 - 30) < 1e-3 && Math.abs(e.ambientAt(0) - t0 - 30) < 1e-3);
+  check('気温を変えても高度による差は変わらない', Math.abs((e.ambientAt(H - 2) - e.ambientAt(0)) - (g0 - t0)) < 1e-3);
+  run(e, 2);
+  check('空きセルは新しい気温になる', Math.abs(e.temp[e.idx(40, 50)] - e.ambientAt(50)) < 1e-3);
+
+  // 寒い環境では水が凍り、暑い環境では氷が融ける
+  const pond = (shift, type, frames) => {
+    const w = box();
+    w.setAmbientShift(shift);
+    for (let y = H - 4; y < H - 1; y++) for (let x = 20; x < 60; x++) { w.set(x, y, type); }
+    run(w, frames);
+    return [count(w, ids.ICE), count(w, ids.WATER)];
+  };
+  const [coldIce] = pond(-60, ids.WATER, 3000);
+  const [normalIce] = pond(0, ids.WATER, 3000);
+  check('気温を氷点より下にすると水が凍る', coldIce > 0 && normalIce === 0, `cold=${coldIce} normal=${normalIce}`);
+  const [hotIce] = pond(60, ids.ICE, 1200);
+  const [normalIce2] = pond(0, ids.ICE, 1200);
+  check('氷は暑い環境のほうが速く融ける', hotIce < normalIce2, `hot=${hotIce} normal=${normalIce2}`);
+}
+
 // 4. 加熱された水は沸騰して蒸気になり、体積が 25 倍になる
 {
   const e = box();
@@ -60,13 +107,55 @@ const run = (e, n) => { for (let f = 0; f < n; f++) e.update(); };
   check('沸騰で蒸気 25 セルに膨張する', count(e, ids.STEAM) === 25, `steam=${count(e, ids.STEAM)}`);
 }
 
-// 5. 氷点以下の水は凍る
+// 5. 氷点以下の水は凍る。ただし凍結にも潜熱がいる（一瞬では凍らない）
+{
+  const hold = (type, temp, maxFrames) => {
+    const e = box();
+    e.set(40, H - 2, type); // 床の上
+    let frames = -1;
+    for (let f = 0; f < maxFrames && frames < 0; f++) {
+      for (let i = 0; i < e.cells.length; i++) if (e.cells[i] === type) e.temp[i] = temp;
+      e.update();
+      if (count(e, type) === 0) frames = f + 1;
+    }
+    return frames;
+  };
+  const freezeFrames = hold(ids.WATER, T_FREEZE - 1, 400);
+  check('氷点以下の水は凍る', freezeFrames > 0, `frames=${freezeFrames}`);
+  check('凍結にも潜熱がいる（1 フレームでは凍らない）', freezeFrames > 1, `frames=${freezeFrames}`);
+  // 凍結と融解は同じ潜熱を使う: どちらも温度差が大きいほど速く、1 フレームでは終わらない
+  const meltFrames = hold(ids.ICE, T_FREEZE + 1, 400);
+  check('融解にも潜熱がいる（1 フレームでは融けない）', meltFrames > 1, `frames=${meltFrames}`);
+  const deepFreeze = hold(ids.WATER, T_FREEZE - 20, 400);
+  const deepMelt = hold(ids.ICE, T_FREEZE + 20, 400);
+  check('温度差が大きいほど凍結も融解も速い', deepFreeze > 0 && deepFreeze < freezeFrames && deepMelt > 0 && deepMelt < meltFrames, `freeze ${freezeFrames}->${deepFreeze} melt ${meltFrames}->${deepMelt}`);
+}
+
+// 5b. 暖かい環境では、氷が隣にあっても水は凍らず、氷は増えない（温度に関係なく凍る規則はない）
 {
   const e = box();
-  e.set(40, 90, ids.WATER);
-  e.temp[e.idx(40, 90)] = T_FREEZE - 5;
-  e.update();
-  check('氷点以下の水は氷になる', count(e, ids.WATER) === 0 && count(e, ids.ICE) === 1);
+  for (let y = H - 5; y < H - 1; y++) { for (let x = 20; x < 30; x++) e.set(x, y, ids.ICE); for (let x = 30; x < 40; x++) e.set(x, y, ids.WATER); }
+  const ice0 = count(e, ids.ICE);
+  run(e, 1500);
+  check('暖かい環境で氷が水を凍らせて増えることはない', count(e, ids.ICE) <= ice0, `ice ${ice0} -> ${count(e, ids.ICE)}`);
+}
+
+// 5c. 雪は氷点に近い冷たい池では氷になり、暖かい池ではただ水になる（池の水温はすぐ気温に近づくので、水面のすぐ上から落とす）
+{
+  const pond = (waterTemp) => {
+    const e = box();
+    for (let y = H - 4; y < H - 1; y++) for (let x = 20; x < 60; x++) { e.set(x, y, ids.WATER); e.temp[e.idx(x, y)] = waterTemp; }
+    let iceMax = 0;
+    for (let f = 0; f < 40; f++) {
+      if (f % 2 === 0) e.set(20 + ((f * 7) % 40), H - 8, ids.SNOW);
+      e.update();
+      iceMax = Math.max(iceMax, count(e, ids.ICE));
+    }
+    return iceMax;
+  };
+  const cold = pond(T_FREEZE + 6), warm = pond(T_AMBIENT_GROUND);
+  check('雪は氷点に近い冷たい池の水面で氷になる', cold >= 3, `ice=${cold}`);
+  check('暖かい池では雪は融けて水になるだけで氷はできない', warm === 0, `ice=${warm}`);
 }
 
 // 6. 氷は暖かい環境で融ける。雪は置いた直後は冷たい
@@ -114,7 +203,7 @@ const run = (e, n) => { for (let f = 0; f < n; f++) e.update(); };
     if (iceX.length === 0) allGone = f;
   }
   check('氷点を超えても一斉には融けない（はじめの 1 セルが融けた時点で残りはまだ氷）', firstGone >= 0 && stillIceAtFirstMelt >= 5, `firstGone=${firstGone} remaining=${stillIceAtFirstMelt}`);
-  check('熱源から遠い氷ほど遅れて融ける（全部融けるまでに時間差がある）', allGone > firstGone + 200, `first=${firstGone} all=${allGone}`);
+  check('熱源から遠い氷ほど遅れて融ける（全部融けるまでに時間差がある）', allGone > firstGone + 100, `first=${firstGone} all=${allGone}`);
 }
 
 // 6d. 氷点を超えた氷の温度は氷点に留まる（熱は融解に使われる）

@@ -33,8 +33,8 @@ function props(ids, { cond, air, init, fixed, cap }) {
 props([METAL],                    { cond: 0.22, air: 0.005 });
 props([GOLD, KINTSUGI],           { cond: 0.20, air: 0.004 });
 props([WATER],                    { cond: 0.15, air: 0.004, cap: 2.5 });
-props([ICE],                      { cond: 0.012, air: 0.006, init: T_FREEZE - 8, cap: 20 }); // 熱を通しにくいので、温まった表面から順に融ける
-props([SNOW],                     { cond: 0.004, air: 0.004, init: T_FREEZE - 6, cap: 24 }); // 断熱性が高く融けにくい
+props([ICE],                      { cond: 0.012, air: 0.006, init: T_FREEZE - 8, cap: 5 }); // 熱を通しにくいので、温まった表面から順に融ける
+props([SNOW],                     { cond: 0.004, air: 0.004, init: T_FREEZE - 6, cap: 10 }); // 断熱性が高く融けにくい
 props([LAVA],                     { cond: 0.003, air: 0.0002, init: T_LAVA, cap: 8 });
 props([LAVA_SPRING],              { cond: 0.003, init: T_LAVA, fixed: true });
 props([FIRE],                     { cond: 0.10, init: T_FIRE, fixed: true });
@@ -54,11 +54,20 @@ export function initialTemp(type) { return INIT[type]; }
 // ─── 気温の行テーブル ─────────────────────────────────────────────────────────
 function ambientRows(engine) {
   const H = engine.height;
-  if (!engine._amb || engine._amb.length !== H) {
+  const shift = engine.ambientShift || 0;
+  if (!engine._amb || engine._amb.length !== H || engine._ambShift !== shift) {
     engine._amb = new Float32Array(H);
-    for (let y = 0; y < H; y++) engine._amb[y] = ambientAtAltitude(engine.altitude(y));
+    engine._ambShift = shift;
+    for (let y = 0; y < H; y++) engine._amb[y] = ambientAtAltitude(engine.altitude(y), shift);
   }
   return engine._amb;
+}
+
+// 環境の気温をずらす（設定のスライダー）。空きセルは次のステップで新しい気温になり、
+// 素材のセルは熱交換でゆっくり新しい気温へ近づく。
+export function setAmbientShift(engine, shift) {
+  engine.ambientShift = shift;
+  ambientRows(engine);
 }
 
 // 全セルを気温で初期化する（コンストラクタ・クリア・リサイズ後）
@@ -116,6 +125,10 @@ export function steamExplosion(engine, wx, wy) {
 // 氷・雪は氷点（T_FREEZE）を超えても、すぐには融けない。氷点より上の熱は融解に使われ（温度は氷点に留まる）、
 // 潜熱 LATENT_FUSION（温度に換算した度数）ぶん熱を受けて初めて水になる。進み具合は engine.meta（0〜255）に持つ。
 // 熱を通しにくい氷では、熱を受けた表面のセルから順に融け、内側は冷たいまま残る。氷点を下回ると進みは戻る（凍り直す）。
+//
+// 凍結も同じ潜熱を使う（対称）: 水は氷点以下になってもすぐには凍らない。氷点より下の冷えは凍結に使われ
+// （温度は氷点に留まり、凍結の潜熱は周りへ放出される）、同じ LATENT_FUSION ぶん冷えて初めて氷になる。
+// 水の meta は凍結の進み（0 = 液体 〜 255 = 凍りきる）、氷の meta は融解の進み（0 = 氷 〜 255 = 融けきる）。
 const LATENT_FUSION = 12;
 const FUSION_RATE = 255 / LATENT_FUSION; // 氷点との差 1 度ぶんの熱で進む量
 const MELT_TINT = [0x3A, 0x6E, 0xA8];    // 融けかけの氷が寄っていく色（水色がかった暗い色）
@@ -156,7 +169,8 @@ export function thermalStep(engine) {
   const amb = ambientRows(engine);
   const { cells, temp, _tmp: out, width: W, height: H } = engine;
 
-  // 1) 熱伝導: 空きセルは気温で固定された熱浴。非空セルだけが隣と熱をやり取りする
+  // 1) 熱伝導: 空きセルは気温で固定された熱浴。非空セルだけが隣と熱をやり取りする。
+  //    画面の外側とは熱をやり取りしない（断熱）。端のセルは外気にさらされず、外から熱も入ってこない。
   for (let y = 0; y < H; y++) {
     const a = amb[y];
     for (let x = 0; x < W; x++) {
@@ -168,16 +182,12 @@ export function thermalStep(engine) {
       let d = 0, j, tj;
       // 左
       if (x > 0) { j = i - 1; tj = cells[j]; d += tj === EMPTY ? air * (a - t) : pairK(c, COND[tj]) * (temp[j] - t); }
-      else d += air * (a - t);
       // 右
       if (x < W - 1) { j = i + 1; tj = cells[j]; d += tj === EMPTY ? air * (a - t) : pairK(c, COND[tj]) * (temp[j] - t); }
-      else d += air * (a - t);
       // 上
       if (y > 0) { j = i - W; tj = cells[j]; d += tj === EMPTY ? air * (amb[y-1] - t) : pairK(c, COND[tj]) * (temp[j] - t); }
-      else d += air * (a - t);
       // 下
       if (y < H - 1) { j = i + W; tj = cells[j]; d += tj === EMPTY ? air * (amb[y+1] - t) : pairK(c, COND[tj]) * (temp[j] - t); }
-      else d += air * (a - t);
       const nt = t + d / cap;
       out[i] = nt < 0 ? 0 : nt > 255 ? 255 : nt;
     }
@@ -196,7 +206,21 @@ export function thermalStep(engine) {
       switch (type) {
         case WATER:
           if (t >= T_BOIL) { steamExplosion(engine, x, y); }
-          else if (t <= T_FREEZE) { engine.set(x, y, ICE); T[i] = t; engine.meta[i] = 0; }
+          else if (t < T_FREEZE) {
+            // 氷点より下の冷えは凍結に使われ、温度は氷点に留まる
+            const next = engine.meta[i] + (T_FREEZE - t) * FUSION_RATE;
+            T[i] = T_FREEZE;
+            if (next >= 255) {
+              engine.set(x, y, ICE);
+              T[i] = T_FREEZE;
+              engine.meta[i] = 0;
+            } else {
+              storeProgress(engine, i, next);
+            }
+          } else if (engine.meta[i] > 0 && engine.meta[i] < 255 && t > T_FREEZE) {
+            // 氷点を超えると、凍りかけが解ける（水の meta は凍結の進みだけを表す）
+            storeProgress(engine, i, Math.max(0, engine.meta[i] - (t - T_FREEZE) * FUSION_RATE));
+          }
           break;
         case ICE:
         case SNOW: {

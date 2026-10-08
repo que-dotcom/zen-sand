@@ -20,9 +20,14 @@ export const T_FIRE         = 215;
 export const T_LAVA         = 255;
 
 // 高度 alt（0 = 地表, 1 = 最上段）の気温
-export function ambientAtAltitude(alt) {
-  return T_AMBIENT_GROUND - (T_AMBIENT_GROUND - T_AMBIENT_TOP) * alt;
+// shift は環境の気温の調整量（設定のスライダー）。高度による下がり方は変えず、全体を上下にずらす。
+export function ambientAtAltitude(alt, shift = 0) {
+  return T_AMBIENT_GROUND - (T_AMBIENT_GROUND - T_AMBIENT_TOP) * alt + shift;
 }
+
+// 設定できる地表の気温の範囲（0〜255 の範囲に収まり、上空の気温も 0 を下回らない）
+export const T_AMBIENT_GROUND_MIN = 30;
+export const T_AMBIENT_GROUND_MAX = 200;
 
 // 気温が露点になる高度（これより上で蒸気が凝結しはじめる）
 export const DEW_ALTITUDE = (T_AMBIENT_GROUND - T_DEW) / (T_AMBIENT_GROUND - T_AMBIENT_TOP);

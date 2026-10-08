@@ -4,6 +4,7 @@ import {
   FUNGUS, GLOW_FUNGUS, ICE, LAVA_SPRING, HARD_SOIL, METAL, RUST, FIREFLY,
   LIGHTNING, SEED, SNOW, GOLD, ASH, ACID, SAKURA_SEED, SAKURA_TREE, CLOUD,
 } from './materials.js';
+import { T_FREEZE } from './materials/climate.js';
 
 export function stripRuby(s) {
   return s.replace(/([一-龠々〆〤ヶ]+)\{([^}]+)\}/g, '$1');
@@ -275,6 +276,8 @@ export const DRILLS = [
       mound(e, Math.floor(W * 0.10), H - 5, 4, STONE);
       mound(e, Math.floor(W * 0.90), H - 5, 5, STONE);
       fillRect(e, cx - pw, H - 4, cx + pw, H - 2, WATER);
+      // 寒い冬の池: 水は氷点のすぐ上まで冷えている（暖かい水は雪が触れても凍らないため）
+      for (let y = H - 4; y <= H - 2; y++) for (let x = cx - pw; x <= cx + pw; x++) e.temp[e.idx(x, y)] = T_FREEZE + 6;
     },
   },
   {

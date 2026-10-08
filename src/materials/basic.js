@@ -6,7 +6,7 @@ import {
 import {
   META_MUD_SUMI
 } from './meta.js';
-import { T_BOIL, T_LAVA_SOLID, T_AMBIENT_GROUND } from './climate.js';
+import { T_BOIL, T_FREEZE, T_LAVA_SOLID, T_AMBIENT_GROUND } from './climate.js';
 
 // ─── Combustion update functions ───────────────────────────────────────────────
 
@@ -47,15 +47,8 @@ export function updateWater(engine, x, y) {
       if (engine.get(x+dx, y+dy) === SAND) { engine.set(x+dx, y+dy, SOIL); break; }
     }
   }
-  // Water + Snow/Ice → ICE（凍結 1%/frame。0.3% だと雪を降らせても
-  // 凍る前に融けてしまい、「反応しているのに見えない」状態になる）
-  if (Math.random() > 0.99) {
-    const nb4w = [[0,1],[1,0],[-1,0],[0,-1]];
-    for (const [dx,dy] of nb4w) {
-      const wn = engine.get(x+dx, y+dy);
-      if (wn === SNOW || wn === ICE) { engine.set(x, y, ICE); return; }
-    }
-  }
+  // 水が凍るかどうかは温度で決まる（thermal.js）。隣に雪や氷があるだけでは凍らない。
+  // 冷たい雪・氷は熱伝導で隣の水を冷やし、氷点を下回って潜熱ぶん冷えた水が氷になる。
 }
 
 export function updateSnow(engine, x, y) {
@@ -69,7 +62,21 @@ export function updateSnow(engine, x, y) {
     engine.set(x, y, WATER);
     return;
   }
-  if (below === WATER) { engine.set(x, y, WATER); return; }
+  if (below === WATER) {
+    const wi = engine.idx(x, y + 1);
+    const tw = engine.temp[wi];
+    if (tw <= T_FREEZE + SNOW_SLUSH_WINDOW) {
+      // 氷点に近い冷たい池: 雪は融けきれずに水面で氷になる（氷の蓋が広がっていく）
+      engine.set(x, y, ICE);
+    } else {
+      // 暖かい池: 雪は融けて水になり、融解の熱を奪って池を少し冷やす（氷点の下までは冷やせない）
+      const cooled = tw - (tw - T_FREEZE) * SNOW_COOLING;
+      engine.temp[wi] = cooled;
+      engine.set(x, y, WATER);
+      engine.temp[engine.idx(x, y)] = cooled;
+    }
+    return;
+  }
   const dir = Math.random() > 0.5 ? 1 : -1;
   if (engine.get(x + dir, y + 1) === EMPTY) { engine.swap(x, y, x + dir, y + 1); return; }
   if (engine.get(x - dir, y + 1) === EMPTY) { engine.swap(x, y, x - dir, y + 1); return; }
@@ -131,6 +138,8 @@ export function updateOil(engine, x, y) {
   }
 }
 
+const SNOW_SLUSH_WINDOW = 10;   // 池の水温が氷点からこの範囲内なら、落ちた雪は氷になる
+const SNOW_COOLING      = 0.15; // 暖かい池に雪が融けるとき、氷点までの差のこの割合だけ水が冷える
 const LAVA_QUENCH_WATER = 40; // 水 1 セルを沸騰させるごとに溶岩が失う温度
 const LAVA_COST_MELT    = 40; // 岩 1 セルを溶かすごとに溶岩が失う温度
 

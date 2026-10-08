@@ -280,18 +280,6 @@ export function updateIce(engine, x, y) {
     if (n === ACID  && Math.random() > 0.80) { engine.set(x, y, WATER); return; }
     if (n === STEAM && Math.random() > 0.97) { engine.set(x+dx, y+dy, WATER); } // 蒸気凝結
   }
-  // Slow freeze: spread to adjacent water when cold nearby
-  if (Math.random() > 0.003) return;
-  for (const [dx,dy] of nb4) {
-    if (engine.get(x+dx, y+dy) === WATER) {
-      let cold = false;
-      for (let ey=-3; ey<=3 && !cold; ey++)
-        for (let ex=-3; ex<=3 && !cold; ex++) {
-          const cn = engine.get(x+ex, y+ey);
-          if (cn === SNOW || cn === ICE) cold = true;
-        }
-      if (cold) { engine.set(x+dx, y+dy, ICE); engine.updated[engine.idx(x+dx,y+dy)] = 1; return; }
-    }
-  }
+  // 水が氷に広がるのは温度で決まる（thermal.js）。氷は熱伝導で隣の水を冷やし、冷えきった水が凍る。
 }
 

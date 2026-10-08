@@ -1,5 +1,5 @@
-import { MATERIALS, EMPTY, WATER } from './materials.js';
-import { thermalStep, resetTemps, initialTemp } from './thermal.js';
+import { MATERIALS, EMPTY, WATER, ICE, SNOW } from './materials.js';
+import { thermalStep, resetTemps, initialTemp, setAmbientShift } from './thermal.js';
 import { T_ICE_MELT } from './materials/climate.js';
 
 export class Engine {
@@ -12,6 +12,7 @@ export class Engine {
     this.meta        = new Uint8Array(width * height); // flower color/size lineage
     this.firedEvents = new Set(); // scenario event bus (cleared each frame)
     this.temp        = new Float32Array(width * height); // 温度場 0〜255（空きセルは気温）
+    this.ambientShift = 0; // 環境の気温の調整量（設定のスライダー。0 = 標準）
     resetTemps(this);
   }
 
@@ -19,6 +20,8 @@ export class Engine {
 
   idx(x, y) { return y * this.width + x; }
   inBounds(x, y) { return x >= 0 && x < this.width && y >= 0 && y < this.height; }
+
+  setAmbientShift(shift) { setAmbientShift(this, shift); }
 
   ambientAt(y) { return this._amb && this._amb.length === this.height ? this._amb[y] : 100; }
 
@@ -37,6 +40,8 @@ export class Engine {
     if (type !== EMPTY) {
       const cols = MATERIALS[type].colors;
       this.colors[i] = cols[Math.floor(Math.random() * cols.length)];
+      // 水・氷・雪の meta は相変化の進み（thermal.js）。別の素材から変わったときに前の値を引きずらない
+      if (type === WATER || type === ICE || type === SNOW) this.meta[i] = 0;
       // 温度: 置いた素材に初期温度があればそれ、なければその場所の温度を引き継ぐ
       const t0 = initialTemp(type);
       if (t0 === t0) this.temp[i] = t0;
