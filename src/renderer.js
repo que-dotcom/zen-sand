@@ -1,7 +1,49 @@
 import { EMPTY } from './materials.js';
+import { T_FREEZE, T_BOIL } from './materials/climate.js';
 
 // Background in ABGR (little-endian) format: #0A0A0A fully opaque
 const BG = (0xFF << 24) | (0x0A << 16) | (0x0A << 8) | 0x0A;
+
+// 等温線の色（ABGR）
+const ISO_FREEZE = (0xFF << 24) | (0xFF << 16) | (0xF0 << 8) | 0xA0; // 水色がかった白
+const ISO_BOIL   = (0xFF << 24) | (0xFF << 16) | (0xFF << 8) | 0xFF; // 白
+
+// ─── 温度ビュー（デバッグ）─────────────────────────────────────────────────────
+// 温度 0〜255 を 青→水色→緑→黄→橙→赤→白 のヒートマップにする。
+// 黄色が沸点（150）付近、青が氷点（80）付近になるように色の節を置いてある。
+export const HEAT_STOPS = [
+  [0,   10,  10,  60],
+  [70,  30,  70, 220],
+  [100, 40, 200, 200],
+  [130, 60, 200,  80],
+  [150, 240, 230, 60],
+  [190, 255, 140, 30],
+  [230, 230,  40, 20],
+  [255, 255, 255, 255],
+];
+
+export function heatRGB(t) {
+  const v = Math.min(255, Math.max(0, t));
+  for (let k = 1; k < HEAT_STOPS.length; k++) {
+    const [t1, r1, g1, b1] = HEAT_STOPS[k];
+    if (v <= t1) {
+      const [t0, r0, g0, b0] = HEAT_STOPS[k - 1];
+      const f = (v - t0) / (t1 - t0);
+      return [r0 + (r1 - r0) * f, g0 + (g1 - g0) * f, b0 + (b1 - b0) * f].map(Math.round);
+    }
+  }
+  return [255, 255, 255];
+}
+
+// ABGR の Uint32 パレット（256 段）。dim は空きセル（気温）を素材より暗く描くための係数
+function heatPalette(dim) {
+  const pal = new Uint32Array(256);
+  for (let t = 0; t < 256; t++) {
+    const [r, g, b] = heatRGB(t).map(c => Math.round(c * dim));
+    pal[t] = (0xFF << 24) | (b << 16) | (g << 8) | r;
+  }
+  return pal;
+}
 
 export class Renderer {
   constructor(canvas, engine, cellSize) {
@@ -16,6 +58,10 @@ export class Renderer {
     // Uint32 view for fast per-pixel writes (little-endian ABGR)
     this.pixels = new Uint32Array(this.imageData.data.buffer);
     this.pw = pw;
+    this.tempView = false; // true なら素材の色ではなく温度のヒートマップで描く
+    this.heatSolid = heatPalette(1);
+    this.heatAir   = heatPalette(0.4);
+    this.cursor    = null; // 温度ビューでハイライトするセルのグリッド座標 {x, y}
   }
 
   // Convert 0xRRGGBB hex → little-endian ABGR Uint32
@@ -33,9 +79,19 @@ export class Renderer {
     for (let cy = 0; cy < engine.height; cy++) {
       for (let cx = 0; cx < engine.width; cx++) {
         const i = engine.idx(cx, cy);
-        const color = engine.cells[i] === EMPTY
-          ? BG
-          : this.hexToPixel(engine.colors[i]);
+        const empty = engine.cells[i] === EMPTY;
+        let color;
+        if (this.tempView) {
+          const t = engine.temp[i];
+          color = (empty ? this.heatAir : this.heatSolid)[Math.min(255, Math.max(0, Math.round(t)))];
+          // 等温線: 氷点（水色）と沸点（白）をまたぐ境目のセルを明るい線で縁取る
+          const tr = cx + 1 < engine.width  ? engine.temp[i + 1] : t;
+          const td = cy + 1 < engine.height ? engine.temp[i + engine.width] : t;
+          if ((t - T_BOIL) * (tr - T_BOIL) < 0 || (t - T_BOIL) * (td - T_BOIL) < 0) color = ISO_BOIL;
+          else if ((t - T_FREEZE) * (tr - T_FREEZE) < 0 || (t - T_FREEZE) * (td - T_FREEZE) < 0) color = ISO_FREEZE;
+        } else {
+          color = empty ? BG : this.hexToPixel(engine.colors[i]);
+        }
 
         const px = cx * cs;
         const py = cy * cs;
@@ -49,5 +105,27 @@ export class Renderer {
     }
 
     this.ctx.putImageData(this.imageData, 0, 0);
+    if (this.tempView && this.cursor) this._drawCursor();
+  }
+
+  // 温度ビューのカーソル: 見失わないよう、黒縁つきの白い十字と枠でセルを示す
+  _drawCursor() {
+    const { x, y } = this.cursor;
+    const { engine, cellSize: cs, ctx } = this;
+    if (!engine.inBounds(x, y)) return;
+    const px = x * cs, py = y * cs, arm = cs * 6;
+    ctx.save();
+    for (const [w, col] of [[5, 'rgba(0,0,0,0.9)'], [2, '#fff']]) {
+      ctx.lineWidth = w;
+      ctx.strokeStyle = col;
+      ctx.strokeRect(px - 1, py - 1, cs + 2, cs + 2);
+      ctx.beginPath();
+      ctx.moveTo(px + cs / 2, py - arm); ctx.lineTo(px + cs / 2, py - cs);
+      ctx.moveTo(px + cs / 2, py + cs * 2); ctx.lineTo(px + cs / 2, py + arm);
+      ctx.moveTo(px - arm, py + cs / 2); ctx.lineTo(px - cs, py + cs / 2);
+      ctx.moveTo(px + cs * 2, py + cs / 2); ctx.lineTo(px + arm, py + cs / 2);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 }

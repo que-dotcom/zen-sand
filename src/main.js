@@ -1,16 +1,17 @@
 import { Engine }       from './engine.js';
-import { Renderer }     from './renderer.js';
+import { Renderer, heatRGB } from './renderer.js';
 import { InputHandler } from './input.js';
 import { EMPTY, SAND, WATER, WALL, SNOW, FIRE, OIL, LAVA, COAL,
          SOIL, SEED, FUNGUS, METAL, LIGHTNING,
          STEAM, ACID, MUD, ICE, HARD_SOIL,
          ACID_PLANT, OBSIDIAN, SANDSTONE, BASALT, SPRING, LAVA_SPRING,
-         SAKURA_SEED, SAKURA_PETAL, FIREFLY, POLLEN, MA_VOID, KOI, GOLD } from './materials.js';
+         SAKURA_SEED, SAKURA_PETAL, FIREFLY, POLLEN, MA_VOID, KOI, GOLD, MATERIALS } from './materials.js';
 import { SCENARIOS, MATERIAL_TRIGGER_MAP } from './scenarios.js';
 import { ZenAudio }     from './audio.js';
 import { ChiriRitual }  from './ritual.js';
 import { DRILLS, PracticeMode } from './practice.js';
 import { SpeedGovernor } from './speed.js';
+import { T_FREEZE, T_DEW, T_BOIL, T_LAVA_SOLID, T_STONE_MELT } from './materials/climate.js';
 
 function rubyHTML(s) {
   return s.replace(/([一-龠々〆〤ヶ]+)\{([^}]+)\}/g, '<ruby>$1<rt>$2</rt></ruby>');
@@ -168,7 +169,6 @@ function init() {
   let currentAct     = 0;
 
   const scenarioBar   = document.getElementById('scenario-bar');
-  const scenarioModal = document.getElementById('scenario-modal');
 
   function updateScenarioBar() {
     if (!activeScenario) {
@@ -190,7 +190,7 @@ function init() {
     input.resetUsage();
     scenario.load(engine);
     updateScenarioBar();
-    closeModal();
+    scenarioModal.close();
     showHint(`シナリオ: ${scenario.title}`);
   }
 
@@ -330,14 +330,48 @@ function init() {
     if (e.target === practicePopup) closePracticePopup();
   });
 
-  // ── Scenario modal ────────────────────────────────────────────────────────
-  function openModal() {
-    scenarioModal.classList.add('show');
+  // ── モーダル共通 ─────────────────────────────────────────────────────────
+  // 開く: .show と aria-hidden を切り替え、ダイアログ本体にフォーカスを移す（Esc・Tab が効くように）。
+  // 閉じる: ✕（data-modal-close）・背景クリック・Esc。閉じたら開く前のフォーカスに戻す。
+  // 開いている間は素材のホットキーを無効にし、Tab はモーダル内で循環させる。
+  const openModals = [];
+  function createModal(el, { onOpen } = {}) {
+    const box = el.querySelector('.modal-box');
+    let returnFocus = null;
+    const modal = {
+      get isOpen() { return el.classList.contains('show'); },
+      open() {
+        if (modal.isOpen) return;
+        returnFocus = document.activeElement;
+        onOpen?.();
+        el.classList.add('show');
+        el.setAttribute('aria-hidden', 'false');
+        openModals.push(modal);
+        box.focus();
+      },
+      close() {
+        if (!modal.isOpen) return;
+        el.classList.remove('show');
+        el.setAttribute('aria-hidden', 'true');
+        openModals.splice(openModals.indexOf(modal), 1);
+        if (returnFocus?.isConnected) returnFocus.focus();
+        returnFocus = null;
+      },
+      trapTab(e) {
+        const items = [...box.querySelectorAll('button, input, [href], [tabindex]:not([tabindex="-1"])')];
+        if (!items.length) return;
+        const first = items[0], last = items[items.length - 1];
+        if (e.shiftKey && (document.activeElement === first || document.activeElement === box)) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      },
+    };
+    el.addEventListener('click', e => { if (e.target === el) modal.close(); });
+    el.querySelectorAll('[data-modal-close]').forEach(b => b.addEventListener('click', modal.close));
+    return modal;
   }
 
-  function closeModal() {
-    scenarioModal.classList.remove('show');
-  }
+  // ── Scenario modal ────────────────────────────────────────────────────────
+  const scenarioModal = createModal(document.getElementById('scenario-modal'));
 
   // Build scenario cards
   const scenarioList = document.getElementById('scenario-list');
@@ -361,11 +395,7 @@ function init() {
     scenarioList.appendChild(card);
   });
 
-  document.getElementById('scenario-btn').addEventListener('click', openModal);
-  document.getElementById('scenario-modal-close').addEventListener('click', closeModal);
-  scenarioModal.addEventListener('click', e => {
-    if (e.target === scenarioModal) closeModal();
-  });
+  document.getElementById('scenario-btn').addEventListener('click', scenarioModal.open);
 
   // ── UI: group tabs + material row ─────────────────────────────────────────
   // 「表示中グループ」と「選択中の素材/道具」は別の状態として持つ。
@@ -442,9 +472,15 @@ function init() {
   selectMaterial(SAND);
 
   document.addEventListener('keydown', e => {
+    const top = openModals[openModals.length - 1];
     if (e.key === 'Escape') {
-      closeModal();
-      closePracticePopup();
+      if (top) top.close();
+      else closePracticePopup();
+      return;
+    }
+    if (top) { // モーダルを開いている間は素材のホットキーを効かせない
+      if (e.key === 'Tab') top.trapTab(e);
+      return;
     }
     const mat = PALETTE.find(p => p.key === e.key);
     if (mat) selectMaterial(mat.id);
@@ -538,6 +574,122 @@ function init() {
   });
   updateSpeedBtn();
 
+  // ── デバッグ: 温度ビュー ──────────────────────────────────────────────────
+  // 設定画面（⚙）の「温度ビュー」で、盤面を温度のヒートマップに切り替える。
+  // 凡例の目盛りは素材が変わる温度（氷点・露点・沸点・溶岩が固まる温度・石の融点）。
+  const debugPanel  = document.getElementById('debug-temp');
+  const dtValue     = document.getElementById('dt-value');
+  const dtState     = document.getElementById('dt-state');
+  const dtInfo      = document.getElementById('dt-info');
+  const debugBar    = document.getElementById('debug-temp-bar');
+  const debugMarker = document.getElementById('debug-temp-marker');
+  const debugTicks  = document.getElementById('debug-temp-ticks');
+  debugBar.style.background = 'linear-gradient(to right,' +
+    Array.from({ length: 17 }, (_, k) => {
+      const [r, g, b] = heatRGB(Math.min(255, k * 16));
+      return `rgb(${r},${g},${b}) ${(k * 6.25).toFixed(2)}%`;
+    }).join(',') + ')';
+  // 素材が変わる温度の目盛り。隣り合うものが重ならないよう上下 2 段に交互に置く
+  const TEMP_TICKS = [[0, '0'], [T_FREEZE, `氷点 ${T_FREEZE}`], [T_DEW, `露点 ${T_DEW}`], [T_BOIL, `沸点 ${T_BOIL}`],
+                      [T_LAVA_SOLID, `固化 ${T_LAVA_SOLID}`], [T_STONE_MELT, `岩融 ${T_STONE_MELT}`], [255, '255']];
+  // 隣り合う目盛りが重ならないよう、上下 2 段に交互に置く（1 行ラベル）
+  debugTicks.innerHTML = TEMP_TICKS.map(([t, label], k) =>
+    `<span style="left:${(t / 255 * 100).toFixed(1)}%;top:${k % 2 ? 19 : 4}px">${label}</span>`).join('');
+
+  // 温度から「いま何が起きうる温度帯か」を言葉にする
+  function tempState(t) {
+    if (t <= T_FREEZE)       return ['❄ 氷点以下 — 水は凍る', '#8fd8ff'];
+    if (t < T_DEW)           return ['低温 — 蒸気は凝結して雲になる', '#7fd3d8'];
+    if (t < T_BOIL - 15)     return ['常温', '#9be08a'];
+    if (t < T_BOIL)          return ['高温 — まもなく沸騰', '#f2e35a'];
+    if (t < T_STONE_MELT - 20) return ['♨ 沸点以上 — 水は蒸発する（可燃物は発火）', '#ffb04a'];
+    if (t < T_STONE_MELT)    return ['🔥 灼熱 — 岩が溶けはじめる', '#ff6a3a'];
+    return ['🌋 溶岩の熱 — 岩は溶ける', '#ffffff'];
+  }
+
+  let debugCursor = null; // 最後にカーソルがあったグリッド座標
+
+  function updateTempReadout() {
+    if (!renderer.tempView) return;
+    renderer.cursor = debugCursor;
+    if (!debugCursor || !engine.inBounds(debugCursor.x, debugCursor.y)) {
+      dtValue.textContent = '--';
+      dtValue.style.color = '';
+      dtState.textContent = 'カーソルを盤面に合わせてください';
+      dtInfo.textContent = '';
+      debugMarker.style.display = 'none';
+      return;
+    }
+    const { x, y } = debugCursor;
+    const i = engine.idx(x, y);
+    const type = engine.cells[i];
+    const t = engine.temp[i];
+    const name = type === EMPTY ? '空気' : (MATERIALS[type]?.name ?? `#${type}`);
+    const [state, color] = tempState(t);
+    dtValue.innerHTML = `${t.toFixed(0)}<small>/ 255</small>`;
+    dtValue.style.color = color;
+    dtState.textContent = state;
+    dtInfo.textContent = `${name}  (${x}, ${y})\n気温 ${engine.ambientAt(y).toFixed(0)}  高度 ${engine.altitude(y).toFixed(2)}  差 ${(t - engine.ambientAt(y) >= 0 ? '+' : '') + (t - engine.ambientAt(y)).toFixed(0)}`;
+    debugMarker.style.display = 'block';
+    debugMarker.style.left = `${Math.min(100, Math.max(0, t / 255 * 100))}%`;
+  }
+  canvas.addEventListener('pointermove', e => {
+    debugCursor = input._gridPos(e.clientX, e.clientY);
+    updateTempReadout();
+  });
+  canvas.addEventListener('pointerleave', () => { debugCursor = null; updateTempReadout(); });
+
+  function setTempView(on) {
+    renderer.tempView = on;
+    debugPanel.hidden = !on;
+    updateTempReadout();
+  }
+
+  // ── 設定画面 ─────────────────────────────────────────────────────────────
+  // 項目は SETTINGS に足すだけで画面に並ぶ。get は画面を開くたびに現在値を読み直す
+  // （状態の持ち主は各機能側。設定画面はスイッチの見た目しか持たない）。
+  const SETTINGS = [
+    {
+      section: 'デバッグ',
+      name: '🌡 温度ビュー',
+      desc: '盤面を温度のヒートマップで表示します。カーソルを当てたセルの温度・素材・気温と、沸点・氷点の等温線を確認できます。',
+      get: () => renderer.tempView,
+      set: on => setTempView(on),
+    },
+  ];
+
+  const settingsList = document.getElementById('settings-list');
+  const settingInputs = [];
+  let lastSection = null;
+  SETTINGS.forEach((item, k) => {
+    if (item.section !== lastSection) {
+      lastSection = item.section;
+      const h = document.createElement('div');
+      h.className = 'settings-section';
+      h.textContent = item.section;
+      settingsList.appendChild(h);
+    }
+    const row = document.createElement('label');
+    row.className = 'settings-row';
+    row.innerHTML = `
+      <span class="settings-label">
+        <span class="settings-name"></span>
+        <span class="settings-desc"></span>
+      </span>
+      <input type="checkbox" class="settings-switch" role="switch">`;
+    row.querySelector('.settings-name').textContent = item.name;
+    row.querySelector('.settings-desc').textContent = item.desc;
+    const input = row.querySelector('input');
+    input.addEventListener('change', () => item.set(input.checked));
+    settingInputs.push([input, item]);
+    settingsList.appendChild(row);
+  });
+
+  const settingsModal = createModal(document.getElementById('settings-modal'), {
+    onOpen: () => settingInputs.forEach(([input, item]) => { input.checked = item.get(); }),
+  });
+  document.getElementById('settings-btn').addEventListener('click', settingsModal.open);
+
   // ── Game loop ─────────────────────────────────────────────────────────────
   // 描画は rAF ごと、シミュレーションは「60 ステップ/秒 × 倍速」を時間で積算して回す。
   // 1フレームに回すステップ数は倍速の 2 倍までに抑え、遅れを取り戻そうとして暴走しない。
@@ -585,6 +737,7 @@ function init() {
     const t1 = performance.now();
     audio.ambientTick(waterPresent);
     renderer.render();
+    if (renderer.tempView && renderCount % 6 === 0) updateTempReadout(); // 動く素材の温度に追従
     checkActProgress();
     const t2 = performance.now();
 
