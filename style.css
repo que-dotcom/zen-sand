@@ -691,3 +691,19 @@ rt {
   outline: 2px solid rgba(255, 255, 255, 0.7);
   outline-offset: 2px;
 }
+
+/* キーボードショートカットの表示 */
+.settings-key,
+#debug-temp-title kbd {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 2px;
+  padding: 0 5px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  font: 11px/1.5 ui-monospace, Menlo, monospace;
+  text-align: center;
+}

@@ -436,7 +436,7 @@ function init() {
       const btn = document.createElement('button');
       btn.className  = 'mat-btn';
       btn.dataset.id = mat.id;
-      btn.title      = `${mat.label}  [${mat.key}]`;
+      btn.title      = mat.label;
       btn.classList.toggle('active', mat.id === selectedId);
       btn.classList.toggle('suggest', suggestedIds.has(mat.id));
 
@@ -464,7 +464,7 @@ function init() {
     const found = PALETTE.find(p => p.id === id);
     if (found) {
       showGroup(found.group); // renderMatRow はこの中で走る
-      showHint(`選択: ${found.label}  [${found.key}]`);
+      showHint(`選択: ${found.label}`);
     } else {
       renderMatRow();
     }
@@ -482,8 +482,11 @@ function init() {
       if (e.key === 'Tab') top.trapTab(e);
       return;
     }
-    const mat = PALETTE.find(p => p.key === e.key);
-    if (mat) selectMaterial(mat.id);
+    // 素材の 1 キー直接選択（1〜8, q〜c など）は無効。素材は下部バーから選ぶ。
+    // PALETTE の key は、キーボード操作の設計（docs/keyboard-mode-design.md）で使うために残してある。
+    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    const command = COMMANDS.find(c => c.key === e.key.toLowerCase());
+    if (command) { e.preventDefault(); command.run(); }
   });
 
   // ── UI: brush size ────────────────────────────────────────────────────────
@@ -653,6 +656,7 @@ function init() {
       section: 'デバッグ',
       name: '🌡 温度ビュー',
       desc: '盤面を温度のヒートマップで表示します。カーソルを当てたセルの温度・素材・気温と、沸点・氷点の等温線を確認できます。',
+      shortcut: 'T',
       get: () => renderer.tempView,
       set: on => setTempView(on),
     },
@@ -679,6 +683,12 @@ function init() {
       <input type="checkbox" class="settings-switch" role="switch">`;
     row.querySelector('.settings-name').textContent = item.name;
     row.querySelector('.settings-desc').textContent = item.desc;
+    if (item.shortcut) {
+      const kbd = document.createElement('kbd');
+      kbd.className = 'settings-key';
+      kbd.textContent = item.shortcut;
+      row.querySelector('.settings-name').append(' ', kbd);
+    }
     const input = row.querySelector('input');
     input.addEventListener('change', () => item.set(input.checked));
     settingInputs.push([input, item]);
@@ -689,6 +699,17 @@ function init() {
     onOpen: () => settingInputs.forEach(([input, item]) => { input.checked = item.get(); }),
   });
   document.getElementById('settings-btn').addEventListener('click', settingsModal.open);
+
+  // ── キーボードコマンド ───────────────────────────────────────────────────
+  // 素材のホットキーの代わりに、機能の切り替えだけをコマンドとして割り当てる。
+  // モーダルを開いている間は効かない（keydown ハンドラ側で弾いている）。
+  const COMMANDS = [
+    { key: 't', name: '温度ビューの切り替え', run: () => {
+        const on = !renderer.tempView;
+        setTempView(on);
+        showHint(on ? '温度ビュー ON — [T] で通常画面に戻る' : '通常画面 — [T] で温度ビュー');
+      } },
+  ];
 
   // ── Game loop ─────────────────────────────────────────────────────────────
   // 描画は rAF ごと、シミュレーションは「60 ステップ/秒 × 倍速」を時間で積算して回す。
