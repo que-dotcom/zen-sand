@@ -1,4 +1,6 @@
-import { MATERIALS, EMPTY, LAVA } from './materials.js';
+import { MATERIALS, EMPTY, WATER } from './materials.js';
+import { thermalStep, resetTemps, initialTemp } from './thermal.js';
+import { T_ICE_MELT } from './materials/climate.js';
 
 export class Engine {
   constructor(width, height) {
@@ -9,12 +11,19 @@ export class Engine {
     this.updated     = new Uint8Array(width * height);
     this.meta        = new Uint8Array(width * height); // flower color/size lineage
     this.firedEvents = new Set(); // scenario event bus (cleared each frame)
+    this.temp        = new Float32Array(width * height); // 温度場 0〜255（空きセルは気温）
+    resetTemps(this);
   }
 
   fireEvent(name) { this.firedEvents.add(name); }
 
   idx(x, y) { return y * this.width + x; }
   inBounds(x, y) { return x >= 0 && x < this.width && y >= 0 && y < this.height; }
+
+  ambientAt(y) { return this._amb && this._amb.length === this.height ? this._amb[y] : 100; }
+
+  // 高度 0（地表＝最下段）〜 1（最上段）。気象（露点・雲）の基準になる。
+  altitude(y) { return 1 - y / (this.height - 1); }
 
   get(x, y) {
     if (!this.inBounds(x, y)) return 255;
@@ -28,10 +37,14 @@ export class Engine {
     if (type !== EMPTY) {
       const cols = MATERIALS[type].colors;
       this.colors[i] = cols[Math.floor(Math.random() * cols.length)];
-      if (type === LAVA) this.meta[i] = 0; // 溶岩は最高温から始まる（meta = 冷却量）
+      // 温度: 置いた素材に初期温度があればそれ、なければその場所の温度を引き継ぐ
+      const t0 = initialTemp(type);
+      if (t0 === t0) this.temp[i] = t0;
+      else if (type === WATER && this.temp[i] < T_ICE_MELT + 4) this.temp[i] = T_ICE_MELT + 4; // 氷雪が融けた水は、融点より少し暖かい
     } else {
       this.colors[i] = 0;
       this.meta[i]   = 0;
+      this.temp[i]   = this.ambientAt(y);
     }
   }
 
@@ -47,9 +60,10 @@ export class Engine {
 
   swap(x1, y1, x2, y2) {
     const i1 = this.idx(x1, y1), i2 = this.idx(x2, y2);
-    const tC = this.cells[i1], tK = this.colors[i1], tM = this.meta[i1];
+    const tC = this.cells[i1], tK = this.colors[i1], tM = this.meta[i1], tT = this.temp[i1];
     this.cells[i1]  = this.cells[i2];  this.colors[i1]  = this.colors[i2];  this.meta[i1]  = this.meta[i2];
     this.cells[i2]  = tC;              this.colors[i2]  = tK;               this.meta[i2]  = tM;
+    this.temp[i1]   = this.temp[i2];   this.temp[i2]    = tT;
     this.updated[i1] = 1; this.updated[i2] = 1;
   }
 
@@ -68,11 +82,13 @@ export class Engine {
         if (mat && mat.update) mat.update(this, x, y);
       }
     }
+    thermalStep(this);
   }
 
   clear() {
     this.cells.fill(0);
     this.colors.fill(0);
     this.meta.fill(0);
+    resetTemps(this);
   }
 }

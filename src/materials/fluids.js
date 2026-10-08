@@ -2,8 +2,54 @@ import {
   SNOW, ICE, WATER, ASH, EMPTY, SOIL, COAL, SMOKE, FIRE, METAL, RUST, WALL,
   STONE, GLASS, OBSIDIAN, BASALT, SAND, SANDSTONE, HARD_SOIL, MUD, PLANT,
   FLOWER, DARK_PLANT, DARK_FLOWER, SEED, FUNGUS, GLOW_FUNGUS, SPARK, LAVA,
-  STEAM, LIGHTNING, ACID
+  STEAM, LIGHTNING, ACID, CLOUD
 } from './ids.js';
+import { T_DEW, T_AMBIENT_GROUND, T_AMBIENT_TOP } from './climate.js';
+
+// ─── 露点と雲 ────────────────────────────────────────────────────────────────
+// 気温は高度が上がるほど下がる（climate.js）。蒸気は上昇しながら冷えて、温度が露点（T_DEW）を
+// 下回ると凝結して見える雲（CLOUD）になる。冷えるほど、また近くに雲（凝結核）があるほど凝結しやすい。
+// 雲は厚くなる（隣接する雲が多い）と雨粒を落とし、露点より暖かくなると蒸発して蒸気に戻る。
+const CLOUD_FORM_MAX        = 0.02;  // 気温が最低（最上段）のときの凝結確率/frame（露点ちょうどで 0）
+const CLOUD_SEEDING         = 0.5;   // 隣接する雲 1 つごとの凝結しやすさの上乗せ
+const CLOUD_RAIN_BASE       = 0.0025; // 雨粒を落とす確率/frame（厚みに応じて増える）
+const CLOUD_RAIN_MIN_NEIGH  = 4;     // 雨を降らせるのに必要な隣接する雲の数（8近傍）
+const CLOUD_EVAP_MAX        = 0.06;  // 地表の気温で蒸発する確率/frame（露点ちょうどで 0）
+const CLOUD_DRIFT           = 0.12;  // 横に漂う確率/frame
+
+// 雨粒 1 つは蒸気 25 セル分の体積に相当する（水蒸気爆発の 25 倍膨張の逆）。
+// 水が蒸気になると 25 倍に増えるので、雲が水に戻るときも 25 セル分の雲が 1 粒に集まる。
+// 体積の膨張を受けた蒸気は engine.meta === VAPOR_EXPANDED で印をつけ、凝結するときは 25 セルで水 1 セルに戻る。
+export const VAPOR_EXPANDED = 1;
+const RAIN_DROP_VOLUME = 25;
+
+// 蒸気 1 セルが水に戻る。膨張した蒸気は 25 分の 1 の確率でだけ水が残り、あとは消える（質量保存）。
+function condenseToWater(engine, x, y) {
+  const expanded = engine.meta[engine.idx(x, y)] === VAPOR_EXPANDED;
+  if (expanded && Math.random() > 1 / RAIN_DROP_VOLUME) { engine.set(x, y, EMPTY); return; }
+  engine.set(x, y, WATER);
+  engine.meta[engine.idx(x, y)] = 0;
+}
+function absorbNearbyCloud(engine, x, y, count) {
+  const r = 3, cells = [];
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if ((dx || dy) && engine.get(x+dx, y+dy) === CLOUD) cells.push([x+dx, y+dy, Math.random()]);
+    }
+  }
+  cells.sort((a, b) => a[2] - b[2]);
+  for (let k = 0; k < Math.min(count, cells.length); k++) engine.set(cells[k][0], cells[k][1], EMPTY);
+}
+
+function countCloud8(engine, x, y) {
+  let n = 0;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if ((dx || dy) && engine.get(x+dx, y+dy) === CLOUD) n++;
+    }
+  }
+  return n;
+}
 
 // ─── Liquid & Gas update functions ───────────────────────────────────────────
 
@@ -13,7 +59,7 @@ export function updateSteam(engine, x, y) {
   const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
   for (const [dx,dy] of nb4) {
     const nx = x+dx, ny = y+dy, n = engine.get(nx, ny);
-    if (n === SNOW || n === ICE) { engine.set(x, y, WATER); return; } // 冷えて凝結
+    if (n === SNOW || n === ICE) { condenseToWater(engine, x, y); return; } // 冷えて凝結
     if (n === ASH && Math.random() > 0.99) { engine.set(x, y, EMPTY); engine.set(nx, ny, SOIL); return; } // 灰+蒸気→土（生命サイクル循環）
     if (n === COAL && Math.random() > 0.97) {
       // 蒸気機関: 圧力爆発
@@ -33,12 +79,17 @@ export function updateSteam(engine, x, y) {
     if (dx === 0 && dy === -1 &&
         (n === STONE || n === GLASS || n === OBSIDIAN || n === BASALT || n === SANDSTONE) &&
         Math.random() > 0.97) {
-      engine.set(x, y, WATER); return;
+      condenseToWater(engine, x, y); return;
     }
   }
 
-  // 上空まで昇った蒸気は冷えて雨粒になる（画面上部 25% で 0.5%/frame）
-  if (y < engine.height * 0.25 && Math.random() > 0.995) { engine.set(x, y, WATER); return; }
+  // 露点を下回るまで冷えた蒸気は凝結して雲になる（冷えるほど、雲に近いほど凝結しやすい）
+  const temp = engine.temp[engine.idx(x, y)];
+  if (temp < T_DEW) {
+    const over = Math.min(1, (T_DEW - temp) / (T_DEW - T_AMBIENT_TOP));
+    const p = CLOUD_FORM_MAX * over * (1 + CLOUD_SEEDING * countCloud8(engine, x, y));
+    if (Math.random() < p) { engine.set(x, y, CLOUD); return; }
+  }
 
   // Rise slowly (35% per frame — slower than smoke)
   if (Math.random() > 0.35) {
@@ -64,7 +115,8 @@ export function updateSteam(engine, x, y) {
   const atCeiling = (y === 0 || up === WALL || up === STONE || up === GLASS || up === ICE);
   if (atCeiling && Math.random() > 0.9) {
     // 水滴が落ちる
-    if (engine.inBounds(x, y+1) && engine.get(x, y+1) === EMPTY) {
+    const expanded = engine.meta[engine.idx(x, y)] === VAPOR_EXPANDED;
+    if (engine.inBounds(x, y+1) && engine.get(x, y+1) === EMPTY && (!expanded || Math.random() < 1 / RAIN_DROP_VOLUME)) {
       engine.set(x, y+1, WATER);
     }
     engine.set(x, y, EMPTY); // 蒸気は消えて水滴に変わった
@@ -72,6 +124,42 @@ export function updateSteam(engine, x, y) {
   }
   // 天井でない詰まり → ゆっくり消散
   if (Math.random() > 0.993) { engine.set(x, y, EMPTY); }
+}
+
+// 雲: 露点より高い所に浮かぶ可視の水滴群。厚くなると雨を降らせ、暖かい所では蒸発する。
+export function updateCloud(engine, x, y) {
+  const temp = engine.temp[engine.idx(x, y)];
+
+  // 熱源に触れると蒸発して蒸気に戻る
+  for (const [dx, dy] of [[0,1],[1,0],[-1,0],[0,-1]]) {
+    const n = engine.get(x+dx, y+dy);
+    if (n === FIRE || n === LAVA) { engine.set(x, y, STEAM); return; }
+  }
+
+  // 露点より暖かい空気では蒸発して蒸気に戻る。暖かいほど速い
+  if (temp > T_DEW) {
+    const warm = Math.min(1, (temp - T_DEW) / (T_AMBIENT_GROUND - T_DEW));
+    if (Math.random() < CLOUD_EVAP_MAX * warm) {
+      engine.set(x, y, STEAM); return; // 膨張の印（meta）は引き継ぐ
+    }
+  }
+
+  // 厚い雲は雨粒を落とす（雨粒は WATER として落下する）
+  const neigh = countCloud8(engine, x, y);
+  if (neigh >= CLOUD_RAIN_MIN_NEIGH && Math.random() < CLOUD_RAIN_BASE * (neigh - CLOUD_RAIN_MIN_NEIGH + 1)) {
+    if (engine.get(x, y+1) === EMPTY) {
+      const expanded = engine.meta[engine.idx(x, y)] === VAPOR_EXPANDED;
+      engine.set(x, y, EMPTY); engine.set(x, y+1, WATER); engine.updated[engine.idx(x, y+1)] = 1;
+      engine.meta[engine.idx(x, y+1)] = 0;
+      if (expanded) absorbNearbyCloud(engine, x, y, RAIN_DROP_VOLUME - 1);
+      return;
+    }
+  }
+
+  // 薄い雲（隣接する雲が2以下）はゆっくり沈み、厚い雲は浮かんだまま横に漂う
+  const dir = Math.random() > 0.5 ? 1 : -1;
+  if (neigh <= 2 && Math.random() < 0.03 && engine.get(x, y+1) === EMPTY) { engine.swap(x, y, x, y+1); return; }
+  if (Math.random() < CLOUD_DRIFT && engine.get(x+dir, y) === EMPTY) { engine.swap(x, y, x+dir, y); return; }
 }
 
 export function updateAcid(engine, x, y) {

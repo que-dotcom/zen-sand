@@ -2,7 +2,7 @@ import {
   EMPTY, STONE, SAND, WATER, LAVA, OIL, COAL, SOIL, MUD, GLASS,
   OBSIDIAN, SANDSTONE, BASALT, STEAM, FIRE, PLANT, DARK_PLANT, FLOWER, SPARK, KINTSUGI,
   FUNGUS, GLOW_FUNGUS, ICE, LAVA_SPRING, HARD_SOIL, METAL, RUST, FIREFLY,
-  LIGHTNING, SEED, SNOW, GOLD, ASH, ACID, SAKURA_SEED, SAKURA_TREE,
+  LIGHTNING, SEED, SNOW, GOLD, ASH, ACID, SAKURA_SEED, SAKURA_TREE, CLOUD,
 } from './materials.js';
 
 export function stripRuby(s) {
@@ -88,7 +88,7 @@ export const DRILLS = [
     },
   },
   {
-    id: 'steam', title: '湯けむり', goal: 10, products: [STEAM], place: [FIRE, LAVA],
+    id: 'steam', title: '湯けむり', goal: 10, products: [STEAM, CLOUD], place: [FIRE, LAVA],
     hint: '岩{いわ}の 間{あいだ}の 泉{いずみ}に、火{ひ} [4] か 溶岩{ようがん} [6] を 入{い}れてみよう',
     react: '水{みず}が 温{あたた}まって 湯気{ゆげ}が 出{で}てきた！',
     learn: '水{みず}は 熱{あつ}くなると「蒸気{じょうき}（湯気{ゆげ}）」に なって、空{そら}へ のぼっていくよ。温泉{おんせん}の 湯{ゆ}けむりと 同{おな}じだね。',
