@@ -32,13 +32,16 @@ export function updateSteam(engine, x, y) {
     // WALL/ICE は既存の atCeiling 処理で対応済みのため除外
     if (dx === 0 && dy === -1 &&
         (n === STONE || n === GLASS || n === OBSIDIAN || n === BASALT || n === SANDSTONE) &&
-        Math.random() > 0.997) {
+        Math.random() > 0.97) {
       engine.set(x, y, WATER); return;
     }
   }
 
-  // Rise slowly (25% per frame — slower than smoke)
-  if (Math.random() > 0.25) {
+  // 上空まで昇った蒸気は冷えて雨粒になる（画面上部 35% で 0.5%/frame）
+  if (y < engine.height * 0.35 && Math.random() > 0.995) { engine.set(x, y, WATER); return; }
+
+  // Rise slowly (35% per frame — slower than smoke)
+  if (Math.random() > 0.35) {
     if (Math.random() > 0.997) { engine.set(x, y, EMPTY); } // 微量の蒸発（広い空間で消える）
     return;
   }
@@ -48,6 +51,10 @@ export function updateSteam(engine, x, y) {
   const dir = Math.random() > 0.5 ? 1 : -1;
   if (engine.get(x+dir, y-1) === EMPTY) { engine.swap(x, y, x+dir, y-1); return; }
   if (engine.get(x-dir, y-1) === EMPTY) { engine.swap(x, y, x-dir, y-1); return; }
+  // 蒸気は水より軽い: 上の水を押しのけて浮上する（水は蒸気のいた下へ沈む）
+  if (up === WATER && Math.random() > 0.2) { engine.swap(x, y, x, y-1); return; }
+  if (engine.get(x+dir, y-1) === WATER && Math.random() > 0.4) { engine.swap(x, y, x+dir, y-1); return; }
+  if (engine.get(x-dir, y-1) === WATER && Math.random() > 0.4) { engine.swap(x, y, x-dir, y-1); return; }
   // 横に少し漂う
   if (Math.random() > 0.35) return;
   if (engine.get(x+dir, y) === EMPTY) { engine.swap(x, y, x+dir, y); return; }
@@ -55,7 +62,7 @@ export function updateSteam(engine, x, y) {
 
   // 完全に詰まった（天井または壁に押し付けられた）→ 水滴を垂らす
   const atCeiling = (y === 0 || up === WALL || up === STONE || up === GLASS || up === ICE);
-  if (atCeiling && Math.random() > 0.98) {
+  if (atCeiling && Math.random() > 0.9) {
     // 水滴が落ちる
     if (engine.inBounds(x, y+1) && engine.get(x, y+1) === EMPTY) {
       engine.set(x, y+1, WATER);

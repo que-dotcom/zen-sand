@@ -6,6 +6,7 @@ import {
 import {
   META_MUD_SUMI
 } from './meta.js';
+import { MATERIALS } from './registry.js';
 
 // ─── Combustion update functions ───────────────────────────────────────────────
 
@@ -129,14 +130,79 @@ export function updateOil(engine, x, y) {
   }
 }
 
+// 水蒸気爆発: 溶岩に触れた水 1 セルが沸騰し、体積が STEAM_EXPANSION 倍（現実は約 1000 倍だが 25 倍に抑える）
+// の蒸気になる。元のセル + 近傍の空きセルを近い順に蒸気で埋めて「沸騰」を表現する。
+const STEAM_EXPANSION = 25;
+const STEAM_BURST_RADIUS = 6;
+
+function steamExplosion(engine, wx, wy) {
+  const candidates = [];
+  const r = STEAM_BURST_RADIUS;
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      const d2 = dx*dx + dy*dy;
+      if (d2 === 0 || d2 > r*r) continue;
+      if (engine.get(wx+dx, wy+dy) === EMPTY) candidates.push([d2 + Math.random(), wx+dx, wy+dy]);
+    }
+  }
+  candidates.sort((a, b) => a[0] - b[0]);
+  engine.set(wx, wy, STEAM);
+  engine.meta[engine.idx(wx, wy)] = 0;
+  const extra = Math.min(STEAM_EXPANSION - 1, candidates.length);
+  for (let k = 0; k < extra; k++) {
+    const [, px, py] = candidates[k];
+    engine.set(px, py, STEAM);
+    engine.meta[engine.idx(px, py)] = 0;
+    engine.updated[engine.idx(px, py)] = 1;
+  }
+  engine.fireEvent('steam_explosion');
+}
+
+// ─── 溶岩の温度 ────────────────────────────────────────────────────────────────
+// meta = 冷却量（0 = 噴出したての最高温 〜 255 = 熱を使い果たす）。engine.set(LAVA) で 0 に戻る。
+// 岩を溶かす・水を蒸発させると熱を奪われ、色が暗くなり、255 に達すると岩に固まる。
+const LAVA_COOL_MELT = 20;       // 岩 1 セルを溶かすコスト（約 13 セルで冷える）
+const LAVA_COOL_VAPORIZE = 90;   // 水 1 セルを蒸発させるコスト（3 セルで冷える）
+const LAVA_COOL_COLOR = [0x4A, 0x1A, 0x0C]; // 冷えきった溶岩の色（岩に固まる直前）
+
+// 溶岩セルから熱を amount 奪う。固まったら true を返す。
+function coolLava(engine, x, y, amount) {
+  const i = engine.idx(x, y);
+  const cool = engine.meta[i] + amount;
+  if (cool >= 255) {
+    engine.set(x, y, STONE);
+    engine.meta[i] = 0;
+    return true;
+  }
+  engine.meta[i] = cool;
+  const hot = MATERIALS[LAVA].colors;
+  const base = hot[Math.floor(Math.random() * hot.length)];
+  const t = cool / 255;
+  const ch = (shift, k) => Math.round(((base >> shift) & 0xFF) * (1 - t) + LAVA_COOL_COLOR[k] * t);
+  engine.colors[i] = (ch(16, 0) << 16) | (ch(8, 1) << 8) | ch(0, 2);
+  return false;
+}
+
 export function updateLava(engine, x, y) {
   if (Math.random() > 0.4) return;
   const nbDirs = [[0,1],[1,0],[-1,0],[0,-1]];
   for (const [dx,dy] of nbDirs) {
     const n = engine.get(x+dx, y+dy);
-    if (n === WATER) { engine.set(x, y, STONE); engine.set(x+dx, y+dy, STEAM); engine.meta[engine.idx(x+dx,y+dy)] = 0; return; }
+    if (n === WATER) { // 水蒸気爆発: 水を蒸発させた分だけ溶岩の熱が奪われる
+      steamExplosion(engine, x+dx, y+dy);
+      coolLava(engine, x, y, LAVA_COOL_VAPORIZE);
+      return;
+    }
     if (n === ICE)   { engine.set(x, y, OBSIDIAN); engine.set(x+dx, y+dy, STEAM); engine.meta[engine.idx(x+dx,y+dy)] = 0; return; } // 急冷→黒曜石
     if (n === SNOW)  { engine.set(x, y, OBSIDIAN); engine.set(x+dx, y+dy, STEAM); engine.meta[engine.idx(x+dx,y+dy)] = 0; return; } // 雪でも急冷→黒曜石
+    // 溶岩は岩を溶かす: 水との境目にできた岩の壁を溶かして、溶岩が水へ届き続けるようにする
+    if (n === STONE && Math.random() > 0.85) {
+      // 岩を溶かすと熱を使う。溶けた岩は親の残り熱を引き継ぐ。熱を使い切った溶岩はその場で固まる
+      if (coolLava(engine, x, y, LAVA_COOL_MELT)) return;
+      engine.set(x+dx, y+dy, LAVA);
+      engine.meta[engine.idx(x+dx, y+dy)] = engine.meta[engine.idx(x, y)];
+      continue;
+    }
     if (n === OIL  && Math.random() > 0.3)  { engine.set(x+dx, y+dy, FIRE); }
     if ((n === PLANT || n === DARK_PLANT || n === DARK_FLOWER || n === FLOWER || n === ACID_PLANT || n === SAKURA_TREE) && Math.random() > 0.2) {
       engine.set(x+dx, y+dy, FIRE);

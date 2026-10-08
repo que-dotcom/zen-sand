@@ -1,4 +1,4 @@
-import { MATERIALS, EMPTY } from './materials.js';
+import { MATERIALS, EMPTY, LAVA } from './materials.js';
 
 export class Engine {
   constructor(width, height) {
@@ -28,6 +28,7 @@ export class Engine {
     if (type !== EMPTY) {
       const cols = MATERIALS[type].colors;
       this.colors[i] = cols[Math.floor(Math.random() * cols.length)];
+      if (type === LAVA) this.meta[i] = 0; // 溶岩は最高温から始まる（meta = 冷却量）
     } else {
       this.colors[i] = 0;
       this.meta[i]   = 0;
