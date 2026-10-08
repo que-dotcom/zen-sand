@@ -37,8 +37,8 @@ export function updateSteam(engine, x, y) {
     }
   }
 
-  // 上空まで昇った蒸気は冷えて雨粒になる（画面上部 35% で 0.5%/frame）
-  if (y < engine.height * 0.35 && Math.random() > 0.995) { engine.set(x, y, WATER); return; }
+  // 上空まで昇った蒸気は冷えて雨粒になる（画面上部 25% で 0.5%/frame）
+  if (y < engine.height * 0.25 && Math.random() > 0.995) { engine.set(x, y, WATER); return; }
 
   // Rise slowly (35% per frame — slower than smoke)
   if (Math.random() > 0.35) {
