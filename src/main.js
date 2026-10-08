@@ -11,7 +11,8 @@ import { ZenAudio }     from './audio.js';
 import { ChiriRitual }  from './ritual.js';
 import { DRILLS, PracticeMode } from './practice.js';
 import { SpeedGovernor } from './speed.js';
-import { T_FREEZE, T_DEW, T_BOIL, T_LAVA_SOLID, T_STONE_MELT } from './materials/climate.js';
+import { T_FREEZE, T_DEW, T_BOIL, T_LAVA_SOLID, T_STONE_MELT,
+         T_AMBIENT_GROUND, T_AMBIENT_TOP, T_AMBIENT_GROUND_MIN, T_AMBIENT_GROUND_MAX } from './materials/climate.js';
 
 function rubyHTML(s) {
   return s.replace(/([一-龠々〆〤ヶ]+)\{([^}]+)\}/g, '<ruby>$1<rt>$2</rt></ruby>');
@@ -651,7 +652,23 @@ function init() {
   // ── 設定画面 ─────────────────────────────────────────────────────────────
   // 項目は SETTINGS に足すだけで画面に並ぶ。get は画面を開くたびに現在値を読み直す
   // （状態の持ち主は各機能側。設定画面はスイッチの見た目しか持たない）。
+  // type: 'switch'（既定）は get/set で真偽値、'range' は min/max/step の数値（format は値の表示用）。
   const SETTINGS = [
+    {
+      section: '環境',
+      type: 'range',
+      name: '🌤 気温（地表）',
+      desc: '環境の気温を変えます（上空はそれより低くなります）。氷点（80）を下回ると水が凍り、沸点（150）を上回ると水が沸騰します。素材の温度はゆっくり気温に近づきます。',
+      min: T_AMBIENT_GROUND_MIN, max: T_AMBIENT_GROUND_MAX, step: 1,
+      initial: T_AMBIENT_GROUND,
+      get: () => T_AMBIENT_GROUND + engine.ambientShift,
+      set: v => engine.setAmbientShift(v - T_AMBIENT_GROUND),
+      format: v => {
+        const top = v - (T_AMBIENT_GROUND - T_AMBIENT_TOP);
+        const note = v >= T_BOIL ? '🔥 沸点以上' : v <= T_FREEZE ? '❄ 氷点以下' : top <= T_FREEZE ? '上空は氷点以下' : '常温';
+        return `${v}  （最上段 ${top}）  ${note}`;
+      },
+    },
     {
       section: 'デバッグ',
       name: '🌡 温度ビュー',
@@ -663,7 +680,7 @@ function init() {
   ];
 
   const settingsList = document.getElementById('settings-list');
-  const settingInputs = [];
+  const settingSyncs = []; // 画面を開くたびに、各項目の表示を現在値へ合わせる関数
   let lastSection = null;
   SETTINGS.forEach((item, k) => {
     if (item.section !== lastSection) {
@@ -673,14 +690,20 @@ function init() {
       h.textContent = item.section;
       settingsList.appendChild(h);
     }
-    const row = document.createElement('label');
-    row.className = 'settings-row';
+    const isRange = item.type === 'range';
+    const row = document.createElement(isRange ? 'div' : 'label');
+    row.className = isRange ? 'settings-row settings-row-range' : 'settings-row';
     row.innerHTML = `
       <span class="settings-label">
         <span class="settings-name"></span>
         <span class="settings-desc"></span>
-      </span>
-      <input type="checkbox" class="settings-switch" role="switch">`;
+      </span>` + (isRange
+      ? `<span class="settings-range">
+           <input type="range" class="settings-slider" id="setting-${k}" aria-label="">
+           <span class="settings-value" aria-live="polite"></span>
+           <button type="button" class="settings-reset">標準に戻す</button>
+         </span>`
+      : `<input type="checkbox" class="settings-switch" role="switch">`);
     row.querySelector('.settings-name').textContent = item.name;
     row.querySelector('.settings-desc').textContent = item.desc;
     if (item.shortcut) {
@@ -690,13 +713,25 @@ function init() {
       row.querySelector('.settings-name').append(' ', kbd);
     }
     const input = row.querySelector('input');
-    input.addEventListener('change', () => item.set(input.checked));
-    settingInputs.push([input, item]);
+    if (isRange) {
+      const value = row.querySelector('.settings-value');
+      input.min = item.min; input.max = item.max; input.step = item.step;
+      input.setAttribute('aria-label', item.name);
+      const show = () => { value.textContent = item.format(Number(input.value)); };
+      input.addEventListener('input', () => { item.set(Number(input.value)); show(); });
+      row.querySelector('.settings-reset').addEventListener('click', () => {
+        input.value = item.initial; item.set(item.initial); show();
+      });
+      settingSyncs.push(() => { input.value = item.get(); show(); });
+    } else {
+      input.addEventListener('change', () => item.set(input.checked));
+      settingSyncs.push(() => { input.checked = item.get(); });
+    }
     settingsList.appendChild(row);
   });
 
   const settingsModal = createModal(document.getElementById('settings-modal'), {
-    onOpen: () => settingInputs.forEach(([input, item]) => { input.checked = item.get(); }),
+    onOpen: () => settingSyncs.forEach(sync => sync()),
   });
   document.getElementById('settings-btn').addEventListener('click', settingsModal.open);
 
