@@ -58,6 +58,7 @@ function ambientRows(engine) {
   if (!engine._amb || engine._amb.length !== H || engine._ambShift !== shift) {
     engine._amb = new Float32Array(H);
     engine._ambShift = shift;
+    engine._thermalFull = true; // 気温が変わったので全行を気温に合わせ直す
     for (let y = 0; y < H; y++) engine._amb[y] = ambientAtAltitude(engine.altitude(y), shift);
   }
   return engine._amb;
@@ -75,6 +76,7 @@ export function resetTemps(engine) {
   const n = engine.cells.length;
   if (!engine.temp || engine.temp.length !== n) engine.temp = new Float32Array(n);
   engine._amb = null;
+  engine._thermalFull = true;
   const amb = ambientRows(engine);
   for (let y = 0; y < engine.height; y++) {
     engine.temp.fill(amb[y], y * engine.width, (y + 1) * engine.width);
@@ -158,50 +160,75 @@ function lavaColor(i, t) {
   return (ch(16, 0) << 16) | (ch(8, 1) << 8) | ch(0, 2);
 }
 
-// 隣り合う 2 素材の熱の通りやすさ: 直列の熱抵抗なので調和平均（片方が断熱的なら全体も通りにくい）
-function pairK(a, b) { return (2 * a * b) / (a + b); }
+// 隣り合う 2 素材の熱の通りやすさ: 直列の熱抵抗なので調和平均（片方が断熱的なら全体も通りにくい）。
+// 割り算を毎セル・毎辺でしないよう、素材の組ごとに前計算しておく。
+const PAIR = new Float32Array(256 * 256);
+for (let a = 0; a < 256; a++) {
+  for (let b = 0; b < 256; b++) PAIR[(a << 8) | b] = (2 * COND[a] * COND[b]) / (COND[a] + COND[b]);
+}
+
+// 相変化・発火の判定が要る素材（それ以外は判定を飛ばす）
+const PHASE = new Uint8Array(256);
+for (const id of [WATER, ICE, SNOW, LAVA, STONE, OIL, COAL, PLANT, DARK_PLANT, ACID_PLANT, FLOWER, DARK_FLOWER,
+                  SAKURA_TREE, SAKURA_PETAL, FUNGUS, GLOW_FUNGUS, SEED]) PHASE[id] = 1;
 
 // ─── 1 ステップ分の熱伝導と相変化 ──────────────────────────────────────────────
+// 素材のある行（と、直前のステップで素材があった行・その上下 1 行）だけを処理する。
+// それ以外の行は全部が空きセルで、気温のまま変わらないので計算しなくてよい。
 export function thermalStep(engine) {
   const n = engine.cells.length;
   if (!engine.temp || engine.temp.length !== n) resetTemps(engine);
   if (!engine._tmp || engine._tmp.length !== n) engine._tmp = new Float32Array(n);
   const amb = ambientRows(engine);
-  const { cells, temp, _tmp: out, width: W, height: H } = engine;
+  const { cells, temp: T, _tmp: out, width: W, height: H } = engine;
+
+  const [occLo, occHi] = engine.occupiedRows();
+  let lo, hi;
+  if (engine._thermalFull || !engine._thermalRows) {
+    lo = 0; hi = H - 1; // 気温の変更・リサイズ・クリアの直後は全行を気温に合わせ直す
+    engine._thermalFull = false;
+  } else {
+    const [pLo, pHi] = engine._thermalRows; // 前回「素材があった」行（余白を足す前の値）
+    lo = Math.max(0, Math.min(occLo, pLo) - 1);
+    hi = Math.min(H - 1, Math.max(occHi, pHi) + 1);
+  }
+  engine._thermalRows = [occLo, occHi];
+  if (lo > hi) return;
 
   // 1) 熱伝導: 空きセルは気温で固定された熱浴。非空セルだけが隣と熱をやり取りする。
   //    画面の外側とは熱をやり取りしない（断熱）。端のセルは外気にさらされず、外から熱も入ってこない。
-  for (let y = 0; y < H; y++) {
+  //    結果は scratch（out）に書き、あとで範囲ぶんだけ T へ書き戻す（隣の更新前の値を読むため）。
+  for (let y = lo; y <= hi; y++) {
     const a = amb[y];
+    const row = y * W;
+    const aUp = y > 0 ? amb[y - 1] : a, aDown = y < H - 1 ? amb[y + 1] : a;
     for (let x = 0; x < W; x++) {
-      const i = y * W + x;
+      const i = row + x;
       const type = cells[i];
       if (type === EMPTY) { out[i] = a; continue; }
       if (FIXED[type])    { out[i] = INIT[type]; continue; }
-      const t = temp[i], c = COND[type], air = AIR[type], cap = CAP[type];
-      let d = 0, j, tj;
+      const t = T[i], air = AIR[type], base = type << 8;
+      let d = 0, tj;
       // 左
-      if (x > 0) { j = i - 1; tj = cells[j]; d += tj === EMPTY ? air * (a - t) : pairK(c, COND[tj]) * (temp[j] - t); }
+      if (x > 0)     { tj = cells[i - 1]; d += tj === EMPTY ? air * (a - t) : PAIR[base | tj] * (T[i - 1] - t); }
       // 右
-      if (x < W - 1) { j = i + 1; tj = cells[j]; d += tj === EMPTY ? air * (a - t) : pairK(c, COND[tj]) * (temp[j] - t); }
+      if (x < W - 1) { tj = cells[i + 1]; d += tj === EMPTY ? air * (a - t) : PAIR[base | tj] * (T[i + 1] - t); }
       // 上
-      if (y > 0) { j = i - W; tj = cells[j]; d += tj === EMPTY ? air * (amb[y-1] - t) : pairK(c, COND[tj]) * (temp[j] - t); }
+      if (y > 0)     { tj = cells[i - W]; d += tj === EMPTY ? air * (aUp - t) : PAIR[base | tj] * (T[i - W] - t); }
       // 下
-      if (y < H - 1) { j = i + W; tj = cells[j]; d += tj === EMPTY ? air * (amb[y+1] - t) : pairK(c, COND[tj]) * (temp[j] - t); }
-      const nt = t + d / cap;
+      if (y < H - 1) { tj = cells[i + W]; d += tj === EMPTY ? air * (aDown - t) : PAIR[base | tj] * (T[i + W] - t); }
+      const nt = t + d / CAP[type];
       out[i] = nt < 0 ? 0 : nt > 255 ? 255 : nt;
     }
   }
-  engine._tmp = temp;
-  engine.temp = out;
+  T.set(out.subarray(lo * W, (hi + 1) * W), lo * W);
 
   // 2) 相変化・発火: 温度の閾値で素材が変わる
-  const T = engine.temp;
-  for (let y = 0; y < H; y++) {
+  for (let y = lo; y <= hi; y++) {
     for (let x = 0; x < W; x++) {
       const i = y * W + x;
       const type = cells[i];
-      if (type === EMPTY) continue;
+      if (PHASE[type] === 0) continue;
       const t = T[i];
       switch (type) {
         case WATER:

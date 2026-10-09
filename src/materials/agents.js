@@ -6,6 +6,11 @@ import {
   KOI_DIRS, META_DARK, META_ICE_CRYSTAL, STEM_COLORS
 } from './meta.js';
 
+// 近傍の方向表（関数のたびに配列を作らないよう、モジュールで 1 度だけ作る。中身は書き換えない）
+const NB0 = [[0,1],[1,0],[-1,0],[0,-1]];
+const NB1 = [[0,1],[1,0],[-1,0],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
+
+
 // ─── KOI update functions ────────────────────────────────────────────────────
 
 // KOI_BODY: 鯉の胴体ボディセル（updateKoi が頭移動のたびに管理する）
@@ -32,8 +37,8 @@ export function updateKoi(engine, x, y) {
   const dir  = meta & 0x07;
 
   // ──── 死亡判定（4方向に ACID/LAVA があれば消滅）────────────────────────────
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx, dy] of nb4) {
+  const nb4 = NB0;
+  for (let _k1 = 0; _k1 < nb4.length; _k1++) { const dx = nb4[_k1][0], dy = nb4[_k1][1];
     const n = engine.get(x+dx, y+dy);
     if (n === ACID || n === LAVA) {
       engine.set(x, y, EMPTY);
@@ -121,8 +126,8 @@ export function updateMaVoid(engine, x, y) {
   // 実効崩壊確率: 10% × 2% = 0.2%/frame → 平均寿命 ~8〜10 秒 (@ 60fps)
   // → プレイヤーが箱の内部を塗りつぶすのに十分な猶予が生まれる
   let isExposed = false;
-  const nb8 = [[0,1],[1,0],[-1,0],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
-  for (const [dx, dy] of nb8) {
+  const nb8 = NB1;
+  for (let _k2 = 0; _k2 < nb8.length; _k2++) { const dx = nb8[_k2][0], dy = nb8[_k2][1];
     const nx = x+dx, ny = y+dy;
     if (!engine.inBounds(nx, ny)) continue;
     const n = engine.get(nx, ny);
@@ -142,8 +147,8 @@ export function updateMaVoid(engine, x, y) {
 
   // ──── 聖域内の干渉（4方向のみ）──────────────────────────────────────────────
   // 1反応/フレーム: return で打ち切り
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx,dy] of nb4) {
+  const nb4 = NB0;
+  for (let _k3 = 0; _k3 < nb4.length; _k3++) { const dx = nb4[_k3][0], dy = nb4[_k3][1];
     const nx = x+dx, ny = y+dy;
     const n  = engine.get(nx, ny);
     const ni = engine.idx(nx, ny);

@@ -6,6 +6,14 @@ import {
 } from './ids.js';
 import { T_DEW, T_AMBIENT_GROUND, T_AMBIENT_TOP } from './climate.js';
 
+// 近傍の方向表（関数のたびに配列を作らないよう、モジュールで 1 度だけ作る。中身は書き換えない）
+const NB0 = [[0,1],[1,0],[-1,0],[0,-1]];
+const NB1 = [[0,-1],[1,-1],[-1,-1],[1,0],[-1,0],[0,-2]];
+const NB2 = [[0,-1],[1,0],[-1,0],[0,1]];
+const NB3 = [[0,-1],[1,-1],[-1,-1]];
+const NB4 = [[0,-1],[1,0],[-1,0]];
+
+
 // ─── 露点と雲 ────────────────────────────────────────────────────────────────
 // 気温は高度が上がるほど下がる（climate.js）。蒸気は上昇しながら冷えて、温度が露点（T_DEW）を
 // 下回ると凝結して見える雲（CLOUD）になる。冷えるほど、また近くに雲（凝結核）があるほど凝結しやすい。
@@ -56,8 +64,8 @@ function countCloud8(engine, x, y) {
 export function updateSteam(engine, x, y) {
   // No TTL: steam accumulates at ceiling, then drips as water
 
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx,dy] of nb4) {
+  const nb4 = NB0;
+  for (let _k1 = 0; _k1 < nb4.length; _k1++) { const dx = nb4[_k1][0], dy = nb4[_k1][1];
     const nx = x+dx, ny = y+dy, n = engine.get(nx, ny);
     if (n === SNOW || n === ICE) { condenseToWater(engine, x, y); return; } // 冷えて凝結
     if (n === ASH && Math.random() > 0.99) { engine.set(x, y, EMPTY); engine.set(nx, ny, SOIL); return; } // 灰+蒸気→土（生命サイクル循環）
@@ -65,7 +73,7 @@ export function updateSteam(engine, x, y) {
       // 蒸気機関: 圧力爆発
       engine.set(x, y, SMOKE);
       engine.set(nx, ny, FIRE);
-      for (const [ex,ey] of [[0,-1],[1,-1],[-1,-1],[1,0],[-1,0],[0,-2]]) {
+      for (let _k2 = 0; _k2 < NB1.length; _k2++) { const ex = NB1[_k2][0], ey = NB1[_k2][1];
         const px=x+ex, py=y+ey;
         if (engine.inBounds(px,py) && engine.get(px,py) === EMPTY) {
           engine.set(px, py, Math.random() > 0.4 ? FIRE : SMOKE);
@@ -131,7 +139,7 @@ export function updateCloud(engine, x, y) {
   const temp = engine.temp[engine.idx(x, y)];
 
   // 熱源に触れると蒸発して蒸気に戻る
-  for (const [dx, dy] of [[0,1],[1,0],[-1,0],[0,-1]]) {
+  for (let _k3 = 0; _k3 < NB0.length; _k3++) { const dx = NB0[_k3][0], dy = NB0[_k3][1];
     const n = engine.get(x+dx, y+dy);
     if (n === FIRE || n === LAVA) { engine.set(x, y, STEAM); return; }
   }
@@ -163,9 +171,9 @@ export function updateCloud(engine, x, y) {
 }
 
 export function updateAcid(engine, x, y) {
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
+  const nb4 = NB0;
 
-  for (const [dx,dy] of nb4) {
+  for (let _k4 = 0; _k4 < nb4.length; _k4++) { const dx = nb4[_k4][0], dy = nb4[_k4][1];
     const nx = x+dx, ny = y+dy, n = engine.get(nx, ny);
     if (n === WALL        && Math.random() > 0.98)  { engine.set(nx, ny, EMPTY); return; }
     if (n === SAND        && Math.random() > 0.92)  { engine.set(nx, ny, EMPTY); return; }
@@ -191,7 +199,7 @@ export function updateAcid(engine, x, y) {
       // 最後の輝き: SPARKバースト + 隣接発光菌へ連鎖爆発を伝播
       const si = engine.idx(nx, ny);
       engine.cells[si] = SPARK; engine.colors[si] = 0x00FFDD; engine.updated[si] = 1;
-      for (const [bx,by] of [[0,-1],[1,0],[-1,0],[0,1]]) {
+      for (let _k5 = 0; _k5 < NB2.length; _k5++) { const bx = NB2[_k5][0], by = NB2[_k5][1];
         const px=nx+bx, py=ny+by;
         if (!engine.inBounds(px,py)) continue;
         const pn = engine.get(px,py);
@@ -205,7 +213,7 @@ export function updateAcid(engine, x, y) {
       // 激しい反応 → 蒸気バースト
       engine.set(x, y, STEAM); engine.meta[engine.idx(x,y)] = 0;
       engine.set(nx, ny, SMOKE);
-      for (const [ex,ey] of [[0,-1],[1,-1],[-1,-1]]) {
+      for (let _k6 = 0; _k6 < NB3.length; _k6++) { const ex = NB3[_k6][0], ey = NB3[_k6][1];
         const px=x+ex, py=y+ey;
         if (engine.inBounds(px,py) && engine.get(px,py) === EMPTY) { engine.set(px,py,STEAM); engine.meta[engine.idx(px,py)] = 0; }
       }
@@ -234,9 +242,9 @@ export function updateMud(engine, x, y) {
     }
   }
 
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
+  const nb4 = NB0;
 
-  for (const [dx,dy] of nb4) {
+  for (let _k7 = 0; _k7 < nb4.length; _k7++) { const dx = nb4[_k7][0], dy = nb4[_k7][1];
     const n = engine.get(x+dx, y+dy);
     if (n === FIRE && Math.random() > 0.95) { engine.set(x, y, STONE);  return; } // 焼成→石
     if (n === LAVA && Math.random() > 0.95) { engine.set(x, y, BASALT); return; } // 溶岩+泥→玄武岩
@@ -257,8 +265,8 @@ export function updateMud(engine, x, y) {
 }
 
 export function updateIce(engine, x, y) {
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx,dy] of nb4) {
+  const nb4 = NB0;
+  for (let _k8 = 0; _k8 < nb4.length; _k8++) { const dx = nb4[_k8][0], dy = nb4[_k8][1];
     const n = engine.get(x+dx, y+dy);
     if (n === FIRE  && Math.random() > 0.90) { engine.set(x, y, WATER); return; }
     if (n === LAVA  && Math.random() > 0.60) {
@@ -271,7 +279,7 @@ export function updateIce(engine, x, y) {
     }
     if ((n === LIGHTNING || n === SPARK) && Math.random() > 0.70) {
       engine.set(x, y, WATER);
-      for (const [sdx,sdy] of [[0,-1],[1,0],[-1,0]]) {
+      for (let _k9 = 0; _k9 < NB4.length; _k9++) { const sdx = NB4[_k9][0], sdy = NB4[_k9][1];
         const px=x+sdx, py=y+sdy;
         if (engine.inBounds(px,py) && engine.get(px,py) === EMPTY) { engine.set(px,py,SPARK); }
       }

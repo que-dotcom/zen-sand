@@ -1,5 +1,9 @@
 import { MATERIALS, EMPTY, WATER, ICE, SNOW } from './materials.js';
 import { thermalStep, resetTemps, initialTemp, setAmbientShift } from './thermal.js';
+
+// 素材 ID → 更新関数の表（毎セル MATERIALS[type].update を引くより速い）
+const UPDATERS = new Array(256).fill(undefined);
+for (const id of Object.keys(MATERIALS)) UPDATERS[id] = MATERIALS[id].update || undefined;
 import { T_ICE_MELT } from './materials/climate.js';
 
 export class Engine {
@@ -72,19 +76,47 @@ export class Engine {
     this.updated[i1] = 1; this.updated[i2] = 1;
   }
 
+  // 素材のあるセルが存在する行の範囲 [最上行, 最下行]。何も無ければ最上行 > 最下行。
+  // 空の行を 4 バイトずつ（Uint32）読み飛ばして求めるので、ほぼ空の盤面でも速い。
+  occupiedRows() {
+    const { cells, width: W, height: H } = this;
+    const n = cells.length;
+    if (!this._cells32 || this._cells32.buffer !== cells.buffer) this._cells32 = new Uint32Array(cells.buffer, cells.byteOffset, n >> 2);
+    const words = this._cells32;
+    let w = 0;
+    while (w < words.length && words[w] === 0) w++;
+    let first = w * 4;
+    if (w === words.length) first = words.length * 4; // 4 バイトに収まらない端数の残り
+    while (first < n && cells[first] === EMPTY) first++;
+    if (first >= n) return [0, -1];
+    let last = n - 1;
+    let wl = words.length - 1;
+    while (last >= wl * 4 + 4 && cells[last] === EMPTY) last--; // 端数
+    if (last < wl * 4 + 4) {
+      while (wl >= 0 && words[wl] === 0) wl--;
+      last = wl * 4 + 3;
+      while (last > first && cells[last] === EMPTY) last--;
+    }
+    return [Math.floor(first / W), Math.floor(last / W)];
+  }
+
   update() {
     this.firedEvents.clear();
     this.updated.fill(0);
-    for (let y = this.height - 1; y >= 0; y--) {
+    const { cells, updated, width: W } = this;
+    const [top, bottom] = this.occupiedRows();
+    // 素材のある行だけを下から順に更新する（上へ昇る素材は次のフレームで処理される）
+    for (let y = bottom; y >= top; y--) {
       const ltr = (y & 1) === 0;
-      for (let xi = 0; xi < this.width; xi++) {
-        const x = ltr ? xi : this.width - 1 - xi;
-        const i = this.idx(x, y);
-        if (this.updated[i]) continue;
-        const type = this.cells[i];
+      const row = y * W;
+      for (let xi = 0; xi < W; xi++) {
+        const x = ltr ? xi : W - 1 - xi;
+        const i = row + x;
+        if (updated[i]) continue;
+        const type = cells[i];
         if (type === EMPTY) continue;
-        const mat = MATERIALS[type];
-        if (mat && mat.update) mat.update(this, x, y);
+        const update = UPDATERS[type];
+        if (update !== undefined) update(this, x, y);
       }
     }
     thermalStep(this);

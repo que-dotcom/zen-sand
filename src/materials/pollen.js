@@ -6,6 +6,10 @@ import {
   POLLEN_COLS, META_DARK, META_LOTUS, DARK_F_COLORS, LOTUS_COLORS, FLOWER_COLORS
 } from './meta.js';
 
+// 近傍の方向表（関数のたびに配列を作らないよう、モジュールで 1 度だけ作る。中身は書き換えない）
+const NB0 = [[0,1],[1,0],[-1,0],[0,-1]];
+
+
 // ─── Pollen update functions ──────────────────────────────────────────────────
 
 // 花粉放出ヘルパー（FLOWER/DARK_FLOWER/SAKURA_TREE Phase2 の共通ロジック）
@@ -62,9 +66,9 @@ export function updatePollen(engine, x, y) {
   const life    = (meta & POLLEN_LIFE) >> POLLEN_LIFE_SHIFT;  // bits 5-7: 寿命
 
   // ──── 隣接セルとの反応 ────────────────────────────────────────────────────
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
+  const nb4 = NB0;
   let iceAdjacent = false;
-  for (const [dx,dy] of nb4) {
+  for (let _k1 = 0; _k1 < nb4.length; _k1++) { const dx = nb4[_k1][0], dy = nb4[_k1][1];
     const nx = x+dx, ny = y+dy;
     const n  = engine.get(nx, ny);
     const ni = engine.idx(nx, ny);
