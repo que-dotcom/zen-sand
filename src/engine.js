@@ -1,4 +1,4 @@
-import { MATERIALS, EMPTY, WATER, ICE, SNOW } from './materials.js';
+import { MATERIALS, EMPTY, WATER, ICE, SNOW, SPARK } from './materials.js';
 import { thermalStep, resetTemps, initialTemp, setAmbientShift } from './thermal.js';
 
 // 素材 ID → 更新関数の表（毎セル MATERIALS[type].update を引くより速い）
@@ -45,7 +45,7 @@ export class Engine {
       const cols = MATERIALS[type].colors;
       this.colors[i] = cols[Math.floor(Math.random() * cols.length)];
       // 水・氷・雪の meta は相変化の進み（thermal.js）。別の素材から変わったときに前の値を引きずらない
-      if (type === WATER || type === ICE || type === SNOW) this.meta[i] = 0;
+      if (type === WATER || type === ICE || type === SNOW || type === SPARK) this.meta[i] = 0; // 火花の meta は電荷（0 = 広がらない）
       // 温度: 置いた素材に初期温度があればそれ、なければその場所の温度を引き継ぐ
       const t0 = initialTemp(type);
       if (t0 === t0) this.temp[i] = t0;

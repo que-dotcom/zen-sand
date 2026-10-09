@@ -61,6 +61,10 @@ export function updateMetal(engine, x, y) {
   }
 }
 
+// 水中の火花は電荷（meta）を持ち、隣の水へ広がるたびに 1 ずつ減る。電荷が尽きた火花は広がらず、水に戻る。
+// （電荷がないと、広がる速さが消える速さを上回って、池全体が火花のまま戻らなくなる）
+const SPARK_CHARGE_STRIKE = 24; // 雷が水に直撃したときの電荷（≒ 電気が届く距離）
+
 // 雷の隣接反応ヘルパー（進行中・着地点で共用）
 function _lightningReact(engine, x, y) {
   const dirs = NB0;
@@ -95,6 +99,7 @@ function _lightningReact(engine, x, y) {
     } else if (n === WATER) {
       engine.cells[ni]   = SPARK;
       engine.colors[ni]  = MATERIALS[SPARK].colors[Math.floor(Math.random() * MATERIALS[SPARK].colors.length)];
+      engine.meta[ni]    = SPARK_CHARGE_STRIKE;
       engine.updated[ni] = 1;
     } else if (n === SAND   && Math.random() > 0.25) { engine.set(nx, ny, GLASS); }
     else if (n === OIL) {
@@ -272,6 +277,8 @@ export function updateSpark(engine, x, y) {
   if (Math.random() > 0.82) { engine.set(x, y, WATER); return; }
 
   // Spread electric wave through adjacent water (one generation per frame)
+  const charge = engine.meta[engine.idx(x, y)];
+  if (charge <= 1) return; // 電荷が尽きた火花は広がらない
   if (Math.random() > 0.6) return;
   const nb4 = NB0;
   for (let _k10 = 0; _k10 < nb4.length; _k10++) { const dx = nb4[_k10][0], dy = nb4[_k10][1];
@@ -280,6 +287,7 @@ export function updateSpark(engine, x, y) {
       const ni = engine.idx(nx, ny);
       engine.cells[ni]   = SPARK;
       engine.colors[ni]  = MATERIALS[SPARK].colors[Math.floor(Math.random() * MATERIALS[SPARK].colors.length)];
+      engine.meta[ni]    = charge - 1;
       engine.updated[ni] = 1; // one step per frame = visible wave front
     }
   }
