@@ -261,5 +261,33 @@ const run = (e, n) => { for (let f = 0; f < n; f++) e.update(); };
   check('水が増殖しない（凝結しても元の 1 粒を大きく超えない）', maxWater <= 3, `maxWater=${maxWater}`);
 }
 
+// 11. 土: 乾くと砂に、強く熱すると灰に。雪は泥にならない
+{
+  const e = box();
+  e.setAmbientShift(34); // 暑い土地（地表 142）
+  for (let y = 0; y < H; y++) for (const x of [22, 41]) e.set(x, y, ids.WALL); // 区画を仕切る（泥が砂へ流れ込まないように）
+  for (let x = 10; x < 20; x++) { e.set(x, H - 2, ids.SOIL); e.temp[e.idx(x, H - 2)] = 142; }
+  for (let y = H - 5; y < H - 1; y++) for (let x = 26; x < 30; x++) { e.set(x, y, ids.MUD); e.set(x + 9, y, ids.MUD); }
+  for (let x = 30; x < 35; x++) { e.set(x, H - 2, ids.SOIL); e.temp[e.idx(x, H - 2)] = 142; }
+  for (let x = 45; x < 75; x++) { e.set(x, H - 2, ids.SOIL); e.temp[e.idx(x, H - 2)] = 230; }
+  run(e, 60);
+  const ashAt60 = (() => { let n = 0; for (let x = 45; x < 75; x++) for (let y = H - 6; y < H - 1; y++) if (e.get(x, y) === ids.ASH) n++; return n; })();
+  run(e, 1500);
+  let sand = 0, wetSoil = 0, ash = 0;
+  for (let x = 10; x < 20; x++) if (e.get(x, H - 2) === ids.SAND) sand++;
+  for (let x = 31; x < 34; x++) if (e.get(x, H - 2) === ids.SOIL) wetSoil++;
+  ash = ashAt60;
+  check('温かく乾いた土は砂になる', sand >= 8, `sand=${sand}`);
+  check('泥の隣の土は湿ったまま乾かない', wetSoil >= 3, `soil=${wetSoil}`);
+  check("高温の土は灰になる", ash >= 8, `ash=${ash}`);
+}
+{
+  const e = box();
+  for (let x = 10; x < 30; x++) { e.set(x, H - 2, ids.MUD); e.set(x, H - 3, ids.SNOW); }
+  for (let x = 10; x < 30; x++) e.temp[e.idx(x, H - 3)] = T_FREEZE - 20;
+  run(e, 600);
+  check('泥の隣の雪は泥にならない', count(e, ids.MUD) === 20, `mud=${count(e, ids.MUD)}`);
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

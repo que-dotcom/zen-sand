@@ -259,7 +259,6 @@ export function updateMud(engine, x, y) {
       const charge = (m & (SPARK_WATER | SPARK_MUD)) ? (m & SPARK_CHARGE_MASK) : 0;
       if (charge > 1) { engine.set(x, y, SPARK); engine.meta[engine.idx(x, y)] = SPARK_MUD | (charge - 1); return; }
     }
-    if (n === SNOW && Math.random() > 0.98) { engine.set(x+dx, y+dy, MUD); } // 雪→泥
   }
 
   // Viscous flow

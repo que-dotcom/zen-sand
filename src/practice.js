@@ -367,17 +367,17 @@ export const DRILLS = [
     },
   },
   {
-    id: 'mud-snow', title: 'どろの雪原', goal: 8, products: [MUD], place: [MUD],
-    hint: '雪原{せつげん}に、泥{どろ} を 流{なが}してみよう',
-    react: '雪{ゆき}が 泥{どろ}に かわっていく！',
-    learn: '泥{どろ}は となりの 雪{ゆき}を とかして、自分{じぶん}と 同{おな}じ 泥{どろ}に かえていくよ。白{しろ}い 雪原{せつげん}が、どんどん 茶色{ちゃいろ}に そまっていくね。',
-    done: '雪原{せつげん}に、泥{どろ}の 川{かわ}が 流{なが}れた',
+    id: 'dry-soil', title: 'かわく大地', goal: 8, products: [SAND], place: [LAVA],
+    hint: '土{つち}の 丘{おか}に、溶岩{ようがん} を 流{なが}してみよう',
+    react: '土{つち}が かわいて さらさらの 砂{すな}に なった！',
+    learn: '土{つち}は 水気{みずけ}が ぬけて からからに かわくと、ぽろぽろ ほぐれて 砂{すな}に なるよ。もっと 強{つよ}く 焼{や}くと、灰{はい}に なるんだ。',
+    done: '乾{かわ}いた大地に、さらさらの砂が広がった',
     setup(e) {
       const { W, H } = stageFrame(e);
       fillRect(e, 0, H - 3, W - 1, H - 1, STONE);
-      fillRect(e, 0, H - Math.max(17, Math.floor(H * 0.13)), W - 1, H - 4, SNOW);
-      mound(e, Math.floor(W * 0.25), H - 4, Math.max(7, Math.floor(H * 0.06)), SNOW);
-      mound(e, Math.floor(W * 0.72), H - 4, Math.max(9, Math.floor(H * 0.07)), SNOW);
+      fillRect(e, Math.floor(W * 0.1), H - Math.max(15, Math.floor(H * 0.11)), Math.floor(W * 0.9), H - 4, SOIL);
+      mound(e, Math.floor(W * 0.3), H - 4, Math.max(9, Math.floor(H * 0.07)), SOIL);
+      mound(e, Math.floor(W * 0.7), H - 4, Math.max(11, Math.floor(H * 0.08)), SOIL);
     },
   },
   // 「花の風」（草原に花粉→開花）は 2026-08-12 の検収で差し戻し。
