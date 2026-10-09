@@ -288,8 +288,8 @@ export function thermalStep(engine) {
           break;
         }
         case SOIL:
-          // 高温: 土の有機物は焼けて灰になる（水気があっても焼ける）
-          if (t >= T_SOIL_BURN) { if (Math.random() < 0.05) { engine.set(x, y, ASH); T[i] = t; } }
+          // 高温: 土の有機物は燃える。炎が燃え尽きたあとに灰が残る（水気があっても焼ける）
+          if (t >= T_SOIL_BURN) { if (Math.random() < 0.05) engine.set(x, y, FIRE); }
           // 乾燥: 暖かく、まわりに水気がない土は、ほぐれて砂になる
           else if (t >= T_SOIL_DRY && Math.random() < 0.004 && !nearMoisture(cells, x, y, W, H)) {
             engine.set(x, y, SAND); T[i] = t;
