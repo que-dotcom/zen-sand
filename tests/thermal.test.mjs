@@ -289,5 +289,12 @@ const run = (e, n) => { for (let f = 0; f < n; f++) e.update(); };
   check('泥の隣の雪は泥にならない', count(e, ids.MUD) === 20, `mud=${count(e, ids.MUD)}`);
 }
 
+{
+  const e = box();
+  for (let y = H - 12; y < H - 1; y++) for (let x = 10; x < 70; x++) e.set(x, y, ids.SOIL);
+  for (let f = 0; f < 400; f++) { if (f % 8 === 0 && f < 200) e.set(10 + ((f * 7) % 60), H - 13, ids.LAVA); e.update(); }
+  check('溶岩に触れた土は灰になる', count(e, ids.ASH) >= 10, `ash=${count(e, ids.ASH)}`);
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

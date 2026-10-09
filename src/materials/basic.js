@@ -6,7 +6,7 @@ import {
 import {
   META_MUD_SUMI
 } from './meta.js';
-import { T_BOIL, T_FREEZE, T_LAVA_SOLID, T_AMBIENT_GROUND } from './climate.js';
+import { T_BOIL, T_FREEZE, T_LAVA_SOLID, T_AMBIENT_GROUND, T_SOIL_BURN } from './climate.js';
 
 // 近傍の方向表（関数のたびに配列を作らないよう、モジュールで 1 度だけ作る。中身は書き換えない）
 const NB0 = [[0,1],[1,0],[-1,0],[0,-1]];
@@ -149,6 +149,7 @@ const SNOW_SLUSH_WINDOW = 10;   // 池の水温が氷点からこの範囲内な
 const SNOW_COOLING      = 0.15; // 暖かい池に雪が融けるとき、氷点までの差のこの割合だけ水が冷える
 const LAVA_QUENCH_WATER = 40; // 水 1 セルを沸騰させるごとに溶岩が失う温度
 const LAVA_COST_MELT    = 40; // 岩 1 セルを溶かすごとに溶岩が失う温度
+const LAVA_COST_SOIL    = 3;  // 土 1 セルを焼くごとに溶岩が失う温度
 
 export function updateLava(engine, x, y) {
   if (Math.random() > 0.4) return;
@@ -169,6 +170,12 @@ export function updateLava(engine, x, y) {
       engine.temp[li] -= LAVA_COST_MELT;
       engine.set(x+dx, y+dy, LAVA);
       engine.temp[si] = engine.temp[li]; // 溶けた岩は親の残り熱を引き継ぐ
+      continue;
+    }
+    if (n === SOIL) {
+      // 溶岩の熱は土の表面では伝わりきらないので、接触を反応として扱う: 土を灰になる温度まで焼き、溶岩は少し熱を失う
+      const si = engine.idx(x+dx, y+dy);
+      if (engine.temp[si] < T_SOIL_BURN + 10) { engine.temp[si] = T_SOIL_BURN + 10; engine.temp[engine.idx(x, y)] -= LAVA_COST_SOIL; }
       continue;
     }
     if (n === ICE)   { engine.set(x, y, OBSIDIAN); engine.temp[engine.idx(x, y)] = T_AMBIENT_GROUND; engine.set(x+dx, y+dy, STEAM); engine.meta[engine.idx(x+dx,y+dy)] = 0; return; } // 急冷→黒曜石
