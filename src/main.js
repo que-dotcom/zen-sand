@@ -1,5 +1,6 @@
 import { Engine }       from './engine.js';
-import { Renderer, heatRGB } from './renderer.js';
+import { Renderer, heatRGB, stopsRGB, WET_STOPS, ACID_STOPS } from './renderer.js';
+import { wetResistance } from './moisture.js';
 import { InputHandler } from './input.js';
 import { EMPTY, SAND, WATER, WALL, SNOW, FIRE, OIL, LAVA, COAL,
          SOIL, SEED, FUNGUS, METAL, LIGHTNING,
@@ -146,6 +147,8 @@ function init() {
     engine.colors  = new Uint32Array(nw * nh);
     engine.updated = new Uint8Array(nw * nh);
     engine.meta    = new Uint8Array(nw * nh);
+    engine.wet     = new Float32Array(nw * nh);
+    engine.acid    = new Float32Array(nw * nh);
     renderer.resize();
     if (activeScenario) loadScenario(activeScenario);
   });
@@ -594,17 +597,35 @@ function init() {
   const debugBar    = document.getElementById('debug-temp-bar');
   const debugMarker = document.getElementById('debug-temp-marker');
   const debugTicks  = document.getElementById('debug-temp-ticks');
-  debugBar.style.background = 'linear-gradient(to right,' +
-    Array.from({ length: 17 }, (_, k) => {
-      const [r, g, b] = heatRGB(Math.min(255, k * 16));
-      return `rgb(${r},${g},${b}) ${(k * 6.25).toFixed(2)}%`;
-    }).join(',') + ')';
+  const debugTitle  = document.getElementById('debug-temp-title');
+  const debugNote   = document.getElementById('debug-temp-note');
   // 素材が変わる温度の目盛り。隣り合うものが重ならないよう上下 2 段に交互に置く
   const TEMP_TICKS = [[0, '0'], [T_FREEZE, `氷点 ${T_FREEZE}`], [T_DEW, `露点 ${T_DEW}`], [T_BOIL, `沸点 ${T_BOIL}`],
                       [T_LAVA_SOLID, `固化 ${T_LAVA_SOLID}`], [T_STONE_MELT, `岩融 ${T_STONE_MELT}`], [255, '255']];
-  // 隣り合う目盛りが重ならないよう、上下 2 段に交互に置く（1 行ラベル）
-  debugTicks.innerHTML = TEMP_TICKS.map(([t, label], k) =>
-    `<span style="left:${(t / 255 * 100).toFixed(1)}%;top:${k % 2 ? 19 : 4}px">${label}</span>`).join('');
+  const WET_TICKS = [[0, '0 乾'], [30, '乾き 30'], [128, '128'], [200, '泥 200'], [255, '255 飽和']];
+  const ACID_TICKS = [[0, '0 中性'], [64, '64'], [128, '128'], [192, '192'], [255, '255 酸']];
+  // 値ビューごとの見た目。key は設定画面・キーボードの切り替えと共通
+  const VIEWS = {
+    temp: { title: '🌡 温度ビュー', key: 'T', rgb: heatRGB, ticks: TEMP_TICKS,
+            note: '白い線＝沸点・水色の線＝氷点　暗い面＝空気' },
+    wet:  { title: '💧 湿り気ビュー', key: 'M', rgb: t => stopsRGB(WET_STOPS, t), ticks: WET_TICKS,
+            note: '砂色＝乾いている・青＝湿っている　暗い面＝空気' },
+    acid: { title: '🧪 酸性度ビュー', key: 'B', rgb: t => stopsRGB(ACID_STOPS, t), ticks: ACID_TICKS,
+            note: '灰緑＝中性・黄〜白＝強い酸　暗い面＝空気' },
+  };
+  function applyViewChrome(view) {
+    const v = VIEWS[view];
+    debugTitle.innerHTML = `${v.title} <small><kbd>${v.key}</kbd> か ⚙ 設定で切替</small>`;
+    debugNote.textContent = v.note;
+    debugBar.style.background = 'linear-gradient(to right,' +
+      Array.from({ length: 17 }, (_, k) => {
+        const [r, g, b] = v.rgb(Math.min(255, k * 16));
+        return `rgb(${r},${g},${b}) ${(k * 6.25).toFixed(2)}%`;
+      }).join(',') + ')';
+    // 隣り合う目盛りが重ならないよう、上下 2 段に交互に置く（1 行ラベル）
+    debugTicks.innerHTML = v.ticks.map(([t, label], k) =>
+      `<span style="left:${(t / 255 * 100).toFixed(1)}%;top:${k % 2 ? 19 : 4}px">${label}</span>`).join('');
+  }
 
   // 温度から「いま何が起きうる温度帯か」を言葉にする
   function tempState(t) {
@@ -619,8 +640,22 @@ function init() {
 
   let debugCursor = null; // 最後にカーソルがあったグリッド座標
 
+  // 湿り気度・酸性度の段階を言葉にする
+  function wetState(w) {
+    if (w < 30)  return ['からから — 土は温まると乾いて砂になる', '#d8b878'];
+    if (w < 90)  return ['しっとり', '#9bc4c8'];
+    if (w < 170) return ['湿っている', '#6aa8e8'];
+    return ['水を含みきっている', '#4a82ff'];
+  }
+  function acidState(a) {
+    if (a < 8)   return ['中性', '#9be08a'];
+    if (a < 80)  return ['弱い酸', '#d6e05a'];
+    if (a < 180) return ['酸性', '#ffe14a'];
+    return ['強い酸', '#ffffff'];
+  }
+
   function updateTempReadout() {
-    if (!renderer.tempView) return;
+    if (renderer.view === 'normal') return;
     renderer.cursor = debugCursor;
     if (!debugCursor || !engine.inBounds(debugCursor.x, debugCursor.y)) {
       dtValue.textContent = '--';
@@ -633,15 +668,20 @@ function init() {
     const { x, y } = debugCursor;
     const i = engine.idx(x, y);
     const type = engine.cells[i];
-    const t = engine.temp[i];
+    const t = engine.temp[i], w = engine.wet[i], a = engine.acid[i];
     const name = type === EMPTY ? '空気' : (MATERIALS[type]?.name ?? `#${type}`);
-    const [state, color] = tempState(t);
-    dtValue.innerHTML = `${t.toFixed(0)}<small>/ 255</small>`;
+    const view = renderer.view;
+    const value = view === 'temp' ? t : view === 'wet' ? w : a;
+    const [state, color] = view === 'temp' ? tempState(t) : view === 'wet' ? wetState(w) : acidState(a);
+    dtValue.innerHTML = `${value.toFixed(0)}<small>/ 255</small>`;
     dtValue.style.color = color;
     dtState.textContent = state;
-    dtInfo.textContent = `${name}  (${x}, ${y})\n気温 ${engine.ambientAt(y).toFixed(0)}  高度 ${engine.altitude(y).toFixed(2)}  差 ${(t - engine.ambientAt(y) >= 0 ? '+' : '') + (t - engine.ambientAt(y)).toFixed(0)}`;
+    const amb = engine.ambientAt(y);
+    dtInfo.textContent = `${name}  (${x}, ${y})\n温度 ${t.toFixed(0)}  湿り気 ${w.toFixed(0)}  酸性度 ${a.toFixed(0)}\n` +
+      (type === EMPTY ? `気温 ${amb.toFixed(0)}  高度 ${engine.altitude(y).toFixed(2)}`
+                      : `湿りにくさ ${wetResistance(type)}（0 = 湿りやすい 〜 255 = 湿らない）`);
     debugMarker.style.display = 'block';
-    debugMarker.style.left = `${Math.min(100, Math.max(0, t / 255 * 100))}%`;
+    debugMarker.style.left = `${Math.min(100, Math.max(0, value / 255 * 100))}%`;
   }
   canvas.addEventListener('pointermove', e => {
     debugCursor = input._gridPos(e.clientX, e.clientY);
@@ -649,11 +689,14 @@ function init() {
   });
   canvas.addEventListener('pointerleave', () => { debugCursor = null; updateTempReadout(); });
 
-  function setTempView(on) {
-    renderer.tempView = on;
-    debugPanel.hidden = !on;
+  // view: 'normal'（通常）| 'temp' | 'wet' | 'acid'
+  function setView(view) {
+    renderer.view = view;
+    debugPanel.hidden = view === 'normal';
+    if (view !== 'normal') applyViewChrome(view);
     updateTempReadout();
   }
+  const setTempView = on => setView(on ? 'temp' : 'normal');
 
   // ── 設定画面 ─────────────────────────────────────────────────────────────
   // 項目は SETTINGS に足すだけで画面に並ぶ。get は画面を開くたびに現在値を読み直す
@@ -682,6 +725,22 @@ function init() {
       shortcut: 'T',
       get: () => renderer.tempView,
       set: on => setTempView(on),
+    },
+    {
+      section: 'デバッグ',
+      name: '💧 湿り気ビュー',
+      desc: '盤面を湿り気度（0〜255）のヒートマップで表示します。カーソルを当てたセルの湿り気度・酸性度・素材の湿りにくさ（抵抗値）を確認できます。水は土のように湿りにくさが低い素材へ染み込み、ガラスや金属には染みません。',
+      shortcut: 'M',
+      get: () => renderer.view === 'wet',
+      set: on => setView(on ? 'wet' : 'normal'),
+    },
+    {
+      section: 'デバッグ',
+      name: '🧪 酸性度ビュー',
+      desc: '盤面を酸性度（0〜255）のヒートマップで表示します。酸は水の通り道を伝って広がり、水で薄まり、灰や土で中和されます。',
+      shortcut: 'B',
+      get: () => renderer.view === 'acid',
+      set: on => setView(on ? 'acid' : 'normal'),
     },
   ];
 
@@ -744,13 +803,15 @@ function init() {
   // ── キーボードコマンド ───────────────────────────────────────────────────
   // 素材のホットキーの代わりに、機能の切り替えだけをコマンドとして割り当てる。
   // モーダルを開いている間は効かない（keydown ハンドラ側で弾いている）。
-  const COMMANDS = [
-    { key: 't', name: '温度ビューの切り替え', run: () => {
-        const on = !renderer.tempView;
-        setTempView(on);
-        showHint(on ? '温度ビュー ON — [T] で通常画面に戻る' : '通常画面 — [T] で温度ビュー');
-      } },
-  ];
+  const COMMANDS = ['temp', 'wet', 'acid'].map(view => ({
+    key: VIEWS[view].key.toLowerCase(),
+    name: `${VIEWS[view].title}の切り替え`,
+    run: () => {
+      const on = renderer.view !== view;
+      setView(on ? view : 'normal');
+      showHint(on ? `${VIEWS[view].title} ON — [${VIEWS[view].key}] で通常画面に戻る` : `通常画面 — [${VIEWS[view].key}] で${VIEWS[view].title}`);
+    },
+  }));
 
   // ── Game loop ─────────────────────────────────────────────────────────────
   // 描画は rAF ごと、シミュレーションは「60 ステップ/秒 × 倍速」を時間で積算して回す。
@@ -801,7 +862,7 @@ function init() {
     const t1 = performance.now();
     audio.ambientTick(waterPresent);
     renderer.render();
-    if (renderer.tempView && renderCount % 6 === 0) updateTempReadout(); // 動く素材の温度に追従
+    if (renderer.view !== 'normal' && renderCount % 6 === 0) updateTempReadout(); // 動く素材の値に追従
     checkActProgress();
     const t2 = performance.now();
 

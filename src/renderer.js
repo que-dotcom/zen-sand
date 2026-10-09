@@ -35,11 +35,38 @@ export function heatRGB(t) {
   return [255, 255, 255];
 }
 
+// 湿り気度・酸性度の色の節。湿り気度は 乾いた砂色 → 水色 → 濃い青、酸性度は 暗い灰緑 → 黄緑 → 黄 → 白
+export const WET_STOPS = [
+  [0,   150, 120,  70],
+  [90,  110, 160, 170],
+  [170,  40, 130, 220],
+  [255,  10,  40, 170],
+];
+export const ACID_STOPS = [
+  [0,    30,  40,  35],
+  [100, 100, 170,  40],
+  [200, 235, 235,  50],
+  [255, 255, 255, 220],
+];
+// 色の節の間を直線でつなぐ
+export function stopsRGB(stops, t) {
+  const v = Math.min(255, Math.max(0, t));
+  for (let k = 1; k < stops.length; k++) {
+    const [t1, r1, g1, b1] = stops[k];
+    if (v <= t1) {
+      const [t0, r0, g0, b0] = stops[k - 1];
+      const f = (v - t0) / (t1 - t0);
+      return [r0 + (r1 - r0) * f, g0 + (g1 - g0) * f, b0 + (b1 - b0) * f].map(Math.round);
+    }
+  }
+  return stops[stops.length - 1].slice(1);
+}
+
 // ABGR の Uint32 パレット（256 段）。dim は空きセル（気温）を素材より暗く描くための係数
-function heatPalette(dim) {
+function heatPalette(dim, color = heatRGB) {
   const pal = new Uint32Array(256);
   for (let t = 0; t < 256; t++) {
-    const [r, g, b] = heatRGB(t).map(c => Math.round(c * dim));
+    const [r, g, b] = color(t).map(c => Math.round(c * dim));
     pal[t] = (0xFF << 24) | (b << 16) | (g << 8) | r;
   }
   return pal;
@@ -51,12 +78,18 @@ export class Renderer {
     this.engine   = engine;
     this.cellSize = cellSize;
     this.ctx      = canvas.getContext('2d');
-    this.tempView = false; // true なら素材の色ではなく温度のヒートマップで描く
-    this.heatSolid = heatPalette(1);
-    this.heatAir   = heatPalette(0.4);
-    this.cursor    = null; // 温度ビューでハイライトするセルのグリッド座標 {x, y}
+    this.view = 'normal'; // 'normal' | 'temp' | 'wet' | 'acid'。normal 以外は素材の色ではなく値のヒートマップで描く
+    this.palettes = {
+      temp: { solid: heatPalette(1), air: heatPalette(0.4) },
+      wet:  { solid: heatPalette(1, t => stopsRGB(WET_STOPS, t)),  air: heatPalette(0.1, t => stopsRGB(WET_STOPS, t)) },
+      acid: { solid: heatPalette(1, t => stopsRGB(ACID_STOPS, t)), air: heatPalette(0.15, t => stopsRGB(ACID_STOPS, t)) },
+    };
+    this.cursor    = null; // 値ビューでハイライトするセルのグリッド座標 {x, y}
     this.resize();
   }
+
+  get tempView() { return this.view === 'temp'; }
+  set tempView(on) { this.view = on ? 'temp' : 'normal'; }
 
   // 盤面の大きさ（セル数）が変わったときに、描画用のバッファを作り直す。
   // 描画は「1 セル = 1 ピクセル」の小さなバッファに書き、画面へは拡大して貼る
@@ -85,19 +118,22 @@ export class Renderer {
     const { cells, colors, temp, width: W, height: H } = engine;
     if (pixels.length !== cells.length) this.resize();
 
-    if (!this.tempView) {
+    if (this.view === 'normal') {
       for (let i = 0, n = cells.length; i < n; i++) {
         if (cells[i] === EMPTY) { pixels[i] = BG; continue; }
         const c = colors[i];
         pixels[i] = 0xFF000000 | ((c & 0xFF) << 16) | (c & 0xFF00) | ((c >> 16) & 0xFF);
       }
     } else {
-      const solid = this.heatSolid, air = this.heatAir;
+      const { solid, air } = this.palettes[this.view];
+      const isTemp = this.view === 'temp';
+      const field = isTemp ? temp : this.view === 'wet' ? engine.wet : engine.acid;
       for (let cy = 0; cy < H; cy++) {
         for (let cx = 0; cx < W; cx++) {
           const i = cy * W + cx;
-          const t = temp[i];
+          const t = field[i];
           let color = (cells[i] === EMPTY ? air : solid)[t < 0 ? 0 : t > 255 ? 255 : Math.round(t)];
+          if (!isTemp) { pixels[i] = color; continue; }
           // 等温線: 氷点（水色）と沸点（白）をまたぐ境目のセルを明るい線で縁取る
           const tr = cx + 1 < W ? temp[i + 1] : t;
           const td = cy + 1 < H ? temp[i + W] : t;
@@ -113,7 +149,7 @@ export class Renderer {
     const ctx = this.ctx;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(this.buffer, 0, 0, W, H, 0, 0, W * this.cellSize, H * this.cellSize);
-    if (this.tempView && this.cursor) this._drawCursor();
+    if (this.view !== 'normal' && this.cursor) this._drawCursor();
   }
 
   // 温度ビューのカーソル: 見失わないよう、黒縁つきの白い十字と枠でセルを示す

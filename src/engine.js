@@ -5,6 +5,7 @@ import { thermalStep, resetTemps, initialTemp, setAmbientShift } from './thermal
 const UPDATERS = new Array(256).fill(undefined);
 for (const id of Object.keys(MATERIALS)) UPDATERS[id] = MATERIALS[id].update || undefined;
 import { T_ICE_MELT } from './materials/climate.js';
+import { moistureStep, sourceWet, sourceAcid } from './moisture.js';
 
 export class Engine {
   constructor(width, height) {
@@ -16,6 +17,8 @@ export class Engine {
     this.meta        = new Uint8Array(width * height); // flower color/size lineage
     this.firedEvents = new Set(); // scenario event bus (cleared each frame)
     this.temp        = new Float32Array(width * height); // 温度場 0〜255（空きセルは気温）
+    this.wet         = new Float32Array(width * height); // 湿り気度 0〜255（moisture.js）
+    this.acid        = new Float32Array(width * height); // 酸性度 0〜255（moisture.js）
     this.ambientShift = 0; // 環境の気温の調整量（設定のスライダー。0 = 標準）
     resetTemps(this);
   }
@@ -40,8 +43,15 @@ export class Engine {
   set(x, y, type) {
     if (!this.inBounds(x, y)) return;
     const i = this.idx(x, y);
+    const wasEmpty = this.cells[i] === EMPTY;
     this.cells[i] = type;
     if (type !== EMPTY) {
+      // 湿り気・酸性度: 空気から生まれたセルは乾いた中性、水源の素材は決まった値、それ以外は元のセルから引き継ぐ
+      if (wasEmpty) { this.wet[i] = 0; this.acid[i] = 0; }
+      const w0 = sourceWet(type), a0 = sourceAcid(type);
+      if (w0 !== null) this.wet[i] = w0;
+      if (a0 !== null) this.acid[i] = a0;
+      else if (type === WATER) this.acid[i] = 0; // 酸が中和されて水に戻ったときは中性
       const cols = MATERIALS[type].colors;
       this.colors[i] = cols[Math.floor(Math.random() * cols.length)];
       // 水・氷・雪の meta は相変化の進み（thermal.js）。別の素材から変わったときに前の値を引きずらない
@@ -53,6 +63,8 @@ export class Engine {
     } else {
       this.colors[i] = 0;
       this.meta[i]   = 0;
+      this.wet[i]    = 0;
+      this.acid[i]   = 0;
       this.temp[i]   = this.ambientAt(y);
     }
   }
@@ -73,6 +85,9 @@ export class Engine {
     this.cells[i1]  = this.cells[i2];  this.colors[i1]  = this.colors[i2];  this.meta[i1]  = this.meta[i2];
     this.cells[i2]  = tC;              this.colors[i2]  = tK;               this.meta[i2]  = tM;
     this.temp[i1]   = this.temp[i2];   this.temp[i2]    = tT;
+    const tW = this.wet[i1], tA = this.acid[i1];
+    this.wet[i1]    = this.wet[i2];    this.wet[i2]     = tW;
+    this.acid[i1]   = this.acid[i2];   this.acid[i2]    = tA;
     this.updated[i1] = 1; this.updated[i2] = 1;
   }
 
@@ -120,12 +135,15 @@ export class Engine {
       }
     }
     thermalStep(this);
+    moistureStep(this);
   }
 
   clear() {
     this.cells.fill(0);
     this.colors.fill(0);
     this.meta.fill(0);
+    this.wet.fill(0);
+    this.acid.fill(0);
     resetTemps(this);
   }
 }

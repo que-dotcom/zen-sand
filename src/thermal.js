@@ -3,7 +3,7 @@ import {
   EMPTY, WATER, ICE, SNOW, STEAM, CLOUD, LAVA, STONE, FIRE, OIL, COAL, PLANT, DARK_PLANT,
   ACID_PLANT, FLOWER, DARK_FLOWER, SAKURA_TREE, SAKURA_PETAL, FUNGUS, GLOW_FUNGUS, SEED,
   METAL, GOLD, WALL, GLASS, SAND, SOIL, ASH, SMOKE, SPARK, LIGHTNING, LAVA_SPRING,
-  POLLEN, FIREFLY, KINTSUGI, OBSIDIAN, BASALT, SANDSTONE, MUD, ACID, HARD_SOIL, SPRING,
+  POLLEN, FIREFLY, KINTSUGI, OBSIDIAN, BASALT, SANDSTONE, MUD, ACID, HARD_SOIL,
 } from './materials/ids.js';
 import {
   T_FREEZE, T_ICE_MELT, T_BOIL, T_FIRE, T_LAVA, T_LAVA_SOLID, T_STONE_MELT,
@@ -131,6 +131,7 @@ export function steamExplosion(engine, wx, wy) {
 // 凍結も同じ潜熱を使う（対称）: 水は氷点以下になってもすぐには凍らない。氷点より下の冷えは凍結に使われ
 // （温度は氷点に留まり、凍結の潜熱は周りへ放出される）、同じ LATENT_FUSION ぶん冷えて初めて氷になる。
 // 水の meta は凍結の進み（0 = 液体 〜 255 = 凍りきる）、氷の meta は融解の進み（0 = 氷 〜 255 = 融けきる）。
+const SOIL_DRY_WET = 30; // 土の湿り気度がこれを下回ると「乾いた」とみなす
 const LATENT_FUSION = 12;
 const FUSION_RATE = 255 / LATENT_FUSION; // 氷点との差 1 度ぶんの熱で進む量
 const MELT_TINT = [0x3A, 0x6E, 0xA8];    // 融けかけの氷が寄っていく色（水色がかった暗い色）
@@ -171,21 +172,6 @@ for (let a = 0; a < 256; a++) {
 const PHASE = new Uint8Array(256);
 for (const id of [WATER, ICE, SNOW, LAVA, STONE, OIL, COAL, PLANT, DARK_PLANT, ACID_PLANT, FLOWER, DARK_FLOWER,
                   SAKURA_TREE, SAKURA_PETAL, FUNGUS, GLOW_FUNGUS, SEED, SOIL]) PHASE[id] = 1;
-
-// 土の水気: 近く（半径 2）に水・泥・氷雪・水源・植物があれば、土は湿ったままで乾かない
-const MOIST = new Uint8Array(256);
-for (const id of [WATER, MUD, ICE, SNOW, SPRING, STEAM, CLOUD, PLANT, DARK_PLANT, ACID_PLANT, FLOWER, DARK_FLOWER]) MOIST[id] = 1;
-function nearMoisture(cells, x, y, W, H) {
-  for (let dy = -2; dy <= 2; dy++) {
-    const yy = y + dy;
-    if (yy < 0 || yy >= H) continue;
-    for (let dx = -2; dx <= 2; dx++) {
-      const xx = x + dx;
-      if (xx >= 0 && xx < W && MOIST[cells[yy * W + xx]]) return true;
-    }
-  }
-  return false;
-}
 
 // ─── 1 ステップ分の熱伝導と相変化 ──────────────────────────────────────────────
 // 素材のある行（と、直前のステップで素材があった行・その上下 1 行）だけを処理する。
@@ -290,8 +276,8 @@ export function thermalStep(engine) {
         case SOIL:
           // 高温: 土の有機物は燃える。炎が燃え尽きたあとに灰が残る（水気があっても焼ける）
           if (t >= T_SOIL_BURN) { if (Math.random() < 0.05) engine.set(x, y, FIRE); }
-          // 乾燥: 暖かく、まわりに水気がない土は、ほぐれて砂になる
-          else if (t >= T_SOIL_DRY && Math.random() < 0.004 && !nearMoisture(cells, x, y, W, H)) {
+          // 乾燥: 暖かく、湿り気度（moisture.js）が下がりきった土は、ほぐれて砂になる
+          else if (t >= T_SOIL_DRY && engine.wet[i] < SOIL_DRY_WET && Math.random() < 0.006) {
             engine.set(x, y, SAND); T[i] = t;
           }
           break;

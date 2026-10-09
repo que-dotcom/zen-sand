@@ -217,7 +217,7 @@ rt {
 #dt-value { font-size: 30px; line-height: 1.1; font-weight: 700; letter-spacing: 0.02em; }
 #dt-value small { font-size: 12px; font-weight: 400; margin-left: 4px; color: rgba(255,255,255,0.6); }
 #dt-state { font-size: 13px; margin: 2px 0 2px; min-height: 20px; }
-#dt-info { font-size: 11px; color: rgba(255,255,255,0.6); white-space: pre; min-height: 33px; }
+#dt-info { font-size: 11px; color: rgba(255,255,255,0.6); white-space: pre; min-height: 50px; }
 #debug-temp-barwrap { position: relative; margin-top: 6px; padding-top: 10px; }
 #debug-temp-bar { height: 12px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.25); }
 #debug-temp-marker {
