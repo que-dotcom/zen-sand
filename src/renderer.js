@@ -51,17 +51,25 @@ export class Renderer {
     this.engine   = engine;
     this.cellSize = cellSize;
     this.ctx      = canvas.getContext('2d');
-
-    const pw = engine.width  * cellSize;
-    const ph = engine.height * cellSize;
-    this.imageData = this.ctx.createImageData(pw, ph);
-    // Uint32 view for fast per-pixel writes (little-endian ABGR)
-    this.pixels = new Uint32Array(this.imageData.data.buffer);
-    this.pw = pw;
     this.tempView = false; // true なら素材の色ではなく温度のヒートマップで描く
     this.heatSolid = heatPalette(1);
     this.heatAir   = heatPalette(0.4);
     this.cursor    = null; // 温度ビューでハイライトするセルのグリッド座標 {x, y}
+    this.resize();
+  }
+
+  // 盤面の大きさ（セル数）が変わったときに、描画用のバッファを作り直す。
+  // 描画は「1 セル = 1 ピクセル」の小さなバッファに書き、画面へは拡大して貼る
+  // （セルごとに cellSize² 個のピクセルを書くより、書き込み量が 1 / cellSize² で済む）。
+  resize() {
+    const { engine } = this;
+    this.buffer = document.createElement('canvas');
+    this.buffer.width  = engine.width;
+    this.buffer.height = engine.height;
+    this.bctx = this.buffer.getContext('2d');
+    this.imageData = this.bctx.createImageData(engine.width, engine.height);
+    // Uint32 view for fast per-pixel writes (little-endian ABGR)
+    this.pixels = new Uint32Array(this.imageData.data.buffer);
   }
 
   // Convert 0xRRGGBB hex → little-endian ABGR Uint32
@@ -73,38 +81,38 @@ export class Renderer {
   }
 
   render() {
-    const { engine, cellSize, pixels, pw } = this;
-    const cs = cellSize;
+    const { engine, pixels } = this;
+    const { cells, colors, temp, width: W, height: H } = engine;
+    if (pixels.length !== cells.length) this.resize();
 
-    for (let cy = 0; cy < engine.height; cy++) {
-      for (let cx = 0; cx < engine.width; cx++) {
-        const i = engine.idx(cx, cy);
-        const empty = engine.cells[i] === EMPTY;
-        let color;
-        if (this.tempView) {
-          const t = engine.temp[i];
-          color = (empty ? this.heatAir : this.heatSolid)[Math.min(255, Math.max(0, Math.round(t)))];
+    if (!this.tempView) {
+      for (let i = 0, n = cells.length; i < n; i++) {
+        if (cells[i] === EMPTY) { pixels[i] = BG; continue; }
+        const c = colors[i];
+        pixels[i] = 0xFF000000 | ((c & 0xFF) << 16) | (c & 0xFF00) | ((c >> 16) & 0xFF);
+      }
+    } else {
+      const solid = this.heatSolid, air = this.heatAir;
+      for (let cy = 0; cy < H; cy++) {
+        for (let cx = 0; cx < W; cx++) {
+          const i = cy * W + cx;
+          const t = temp[i];
+          let color = (cells[i] === EMPTY ? air : solid)[t < 0 ? 0 : t > 255 ? 255 : Math.round(t)];
           // 等温線: 氷点（水色）と沸点（白）をまたぐ境目のセルを明るい線で縁取る
-          const tr = cx + 1 < engine.width  ? engine.temp[i + 1] : t;
-          const td = cy + 1 < engine.height ? engine.temp[i + engine.width] : t;
+          const tr = cx + 1 < W ? temp[i + 1] : t;
+          const td = cy + 1 < H ? temp[i + W] : t;
           if ((t - T_BOIL) * (tr - T_BOIL) < 0 || (t - T_BOIL) * (td - T_BOIL) < 0) color = ISO_BOIL;
           else if ((t - T_FREEZE) * (tr - T_FREEZE) < 0 || (t - T_FREEZE) * (td - T_FREEZE) < 0) color = ISO_FREEZE;
-        } else {
-          color = empty ? BG : this.hexToPixel(engine.colors[i]);
-        }
-
-        const px = cx * cs;
-        const py = cy * cs;
-        for (let dy = 0; dy < cs; dy++) {
-          const row = (py + dy) * pw + px;
-          for (let dx = 0; dx < cs; dx++) {
-            pixels[row + dx] = color;
-          }
+          pixels[i] = color;
         }
       }
     }
 
-    this.ctx.putImageData(this.imageData, 0, 0);
+    // 小さなバッファを、補間なし（くっきりしたセルの角）で画面いっぱいに拡大して貼る
+    this.bctx.putImageData(this.imageData, 0, 0);
+    const ctx = this.ctx;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(this.buffer, 0, 0, W, H, 0, 0, W * this.cellSize, H * this.cellSize);
     if (this.tempView && this.cursor) this._drawCursor();
   }
 

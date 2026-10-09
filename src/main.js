@@ -18,7 +18,7 @@ function rubyHTML(s) {
   return s.replace(/([一-龠々〆〤ヶ]+)\{([^}]+)\}/g, '<ruby>$1<rt>$2</rt></ruby>');
 }
 
-const CELL_SIZE = 4;
+const CELL_SIZE = 3; // 1 セルの画面上の大きさ（px）。小さいほど盤面の升目が増えて細かくなるが、処理は重くなる
 
 // 素材ではない「道具」のパレットID（負数 = engine.set に渡らない）
 const RAKE_TOOL = -1;
@@ -146,9 +146,7 @@ function init() {
     engine.colors  = new Uint32Array(nw * nh);
     engine.updated = new Uint8Array(nw * nh);
     engine.meta    = new Uint8Array(nw * nh);
-    renderer.imageData = renderer.ctx.createImageData(nw * CELL_SIZE, nh * CELL_SIZE);
-    renderer.pixels    = new Uint32Array(renderer.imageData.data.buffer);
-    renderer.pw        = nw * CELL_SIZE;
+    renderer.resize();
     if (activeScenario) loadScenario(activeScenario);
   });
 
@@ -562,11 +560,17 @@ function init() {
   const governor = new SpeedGovernor();
   const speedBtn = document.getElementById('speed-btn');
   function updateSpeedBtn() {
-    speedBtn.textContent = `${governor.speed}×`;
-    speedBtn.classList.toggle('active', governor.speed > 1);
-    speedBtn.title = governor.calibrated
-      ? `倍速（今の上限 ${governor.maxSpeed(performance.now())}×）`
-      : '倍速（性能を測定中）';
+    // 最速: 上限にいつも追従する（いまの速度を併記）。上限に抑えられているときは「実際/希望」を出す
+    speedBtn.textContent = governor.fastest ? `最速 ${governor.speed}×`
+      : governor.limited ? `${governor.speed}/${governor.requested}×` : `${governor.speed}×`;
+    speedBtn.classList.toggle('active', governor.requested > 1);
+    speedBtn.title = !governor.calibrated
+      ? '倍速（性能を測定中）'
+      : governor.fastest
+        ? `最速 — この端末が 60fps を保てる最大の速さに自動で合わせます（いま ${governor.speed}×）`
+        : governor.limited
+          ? `倍速 ${governor.requested}× を希望 — 今は負荷が高く ${governor.speed}× に抑えています（上限 ${governor.maxSpeed(performance.now())}×）。軽くなれば自動で戻ります`
+          : `倍速（2 の乗数 or 最速。今の上限 ${governor.maxSpeed(performance.now())}×）`;
   }
   speedBtn.addEventListener('click', () => {
     const now = performance.now();
@@ -574,7 +578,9 @@ function init() {
     updateSpeedBtn();
     showHint(!governor.calibrated
       ? '性能を測定中… しばらくしてからもう一度'
-      : `${governor.speed}× — 上限 ${governor.maxSpeed(now)}×（この端末で 60fps を保てる範囲）`);
+      : governor.fastest
+        ? `最速 — いまは ${governor.speed}×（上限に自動で合わせます）`
+        : `${governor.requested}× — 上限 ${governor.maxSpeed(now)}×（この端末で 60fps を保てる範囲）`);
   });
   updateSpeedBtn();
 
@@ -789,7 +795,9 @@ function init() {
     acc = Math.min(acc - steps, 1);
 
     const t0 = performance.now();
-    for (let i = 0; i < steps; i++) stepSimulation();
+    // 予算の時間内でステップを回す。使い切ったら残りは諦め、速度をその分だけ下げる（固まらない）
+    const run = governor.runSteps(steps, stepSimulation);
+    if (run.truncated) acc = 0; // 回しきれなかった分の遅れは取り戻さない
     const t1 = performance.now();
     audio.ambientTick(waterPresent);
     renderer.render();
@@ -797,17 +805,19 @@ function init() {
     checkActProgress();
     const t2 = performance.now();
 
-    lowered = governor.recordWork(t1 - t0, steps, t2 - t1, t2) || lowered;
+    lowered = governor.recordWork(t1 - t0, run.done, t2 - t1, t2) || lowered || run.truncated;
     if (lowered) {
       updateSpeedBtn();
-      showHint(`${governor.speed}× に下げました — 60fps を保てる上限です`);
+      showHint(governor.fastest
+        ? `最速 — 負荷が高いので ${governor.speed}× に合わせました`
+        : `${governor.speed}× に下げました（希望 ${governor.requested}×）— 60fps を保てる上限です。軽くなれば戻ります`);
     } else if (++renderCount % 30 === 0) {
       updateSpeedBtn(); // 較正完了・上限の変化をツールチップに反映
     }
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
-  window.__zen = { engine, practice, input };
+  window.__zen = { engine, practice, input, renderer };
 }
 
 document.addEventListener('DOMContentLoaded', init);
