@@ -114,3 +114,9 @@ export const META_MUD_PETAL  = 3; // MUD:  花びら由来の肥沃
 //   bit  7 (0x80) = META_PETAL_FROZEN: 氷封フラグ（ICE接触で立つ、FIRE/LAVA/解氷で解除）
 //   bits 0-6      = 残り寿命（最大79 = 0x4F → bit 7 は通常 0。衝突なし）
 export const META_PETAL_FROZEN = 0x80;
+
+// 火花の meta: 下位 6 ビット = 電荷、上位 2 ビット = 消えたあと何に戻るか。
+// 戻り先がない火花（空中・燃えた植物・菌の火花）は、消えるだけで水を生まない。
+export const SPARK_CHARGE_MASK = 0x3F;
+export const SPARK_WATER = 0x80; // 水が帯電したもの → 水に戻る
+export const SPARK_MUD   = 0x40; // 泥が帯電したもの → 泥に戻る

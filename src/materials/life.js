@@ -379,7 +379,7 @@ export function updateGlowFungus(engine, x, y) {
   const i = engine.idx(x, y);
   // 連鎖爆発フラグ（酸による死亡が隣接発光菌に伝播）
   if (engine.meta[i] === 255) {
-    engine.cells[i] = SPARK; engine.colors[i] = 0x00FFDD; engine.updated[i] = 1;
+    engine.cells[i] = SPARK; engine.colors[i] = 0x00FFDD; engine.updated[i] = 1; engine.meta[i] = 0;
     const nb4chain = NB0;
     for (let _k11 = 0; _k11 < nb4chain.length; _k11++) { const dx = nb4chain[_k11][0], dy = nb4chain[_k11][1];
       const cx2 = x+dx, cy2 = y+dy;

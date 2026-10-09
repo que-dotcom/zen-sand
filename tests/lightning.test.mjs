@@ -24,5 +24,29 @@ const count = (e, t) => { let n = 0; for (const c of e.cells) if (c === t) n++; 
   check('雷のあと水の量が変わらない', count(e, ids.WATER) === before, `${count(e, ids.WATER)} / ${before}`);
 }
 
+// 泥は雷の電気で光っても、水に変わらず泥のまま戻る
+{
+  const e = new Engine(40, 40);
+  for (let x = 0; x < 40; x++) e.set(x, 39, ids.WALL);
+  for (let x = 10; x < 30; x++) for (let y = 36; y < 39; y++) e.set(x, y, ids.MUD);
+  const mud = count(e, ids.MUD);
+  e.set(20, 20, ids.LIGHTNING);
+  for (let f = 0; f < 200; f++) e.update();
+  check('雷のあと泥が水に変わらない', count(e, ids.WATER) === 0, `water=${count(e, ids.WATER)}`);
+  check('雷のあと泥が残る', count(e, ids.MUD) === mud, `${count(e, ids.MUD)} / ${mud}`);
+}
+
+// 氷に雷を当てても、空中に水が湧かない（融けた氷の分だけ水になる）
+{
+  const e = new Engine(40, 40);
+  for (let x = 0; x < 40; x++) e.set(x, 39, ids.WALL);
+  for (let x = 10; x < 30; x++) for (let y = 36; y < 39; y++) e.set(x, y, ids.ICE);
+  const ice = count(e, ids.ICE);
+  e.set(20, 20, ids.LIGHTNING);
+  for (let f = 0; f < 200; f++) e.update();
+  const total = count(e, ids.ICE) + count(e, ids.WATER) + count(e, ids.SPARK);
+  check('雷のあと氷と水の合計が増えない', total <= ice, `${total} / ${ice}`);
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

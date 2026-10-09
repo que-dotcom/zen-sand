@@ -4,7 +4,10 @@ import {
   FLOWER, DARK_PLANT, DARK_FLOWER, SEED, FUNGUS, GLOW_FUNGUS, SPARK, LAVA,
   STEAM, LIGHTNING, ACID, CLOUD
 } from './ids.js';
+import { SPARK_MUD, SPARK_WATER, SPARK_CHARGE_MASK } from './meta.js';
 import { T_DEW, T_AMBIENT_GROUND, T_AMBIENT_TOP } from './climate.js';
+
+const MUD_CHARGE_STRIKE = 12; // 雷が泥に触れたときの電荷
 
 // 近傍の方向表（関数のたびに配列を作らないよう、モジュールで 1 度だけ作る。中身は書き換えない）
 const NB0 = [[0,1],[1,0],[-1,0],[0,-1]];
@@ -198,7 +201,7 @@ export function updateAcid(engine, x, y) {
     if (n === GLOW_FUNGUS && Math.random() > 0.85)  {
       // 最後の輝き: SPARKバースト + 隣接発光菌へ連鎖爆発を伝播
       const si = engine.idx(nx, ny);
-      engine.cells[si] = SPARK; engine.colors[si] = 0x00FFDD; engine.updated[si] = 1;
+      engine.cells[si] = SPARK; engine.colors[si] = 0x00FFDD; engine.updated[si] = 1; engine.meta[si] = 0;
       for (let _k5 = 0; _k5 < NB2.length; _k5++) { const bx = NB2[_k5][0], by = NB2[_k5][1];
         const px=nx+bx, py=ny+by;
         if (!engine.inBounds(px,py)) continue;
@@ -248,7 +251,14 @@ export function updateMud(engine, x, y) {
     const n = engine.get(x+dx, y+dy);
     if (n === FIRE && Math.random() > 0.95) { engine.set(x, y, STONE);  return; } // 焼成→石
     if (n === LAVA && Math.random() > 0.95) { engine.set(x, y, BASALT); return; } // 溶岩+泥→玄武岩
-    if ((n === LIGHTNING || n === SPARK) && Math.random() > 0.6) { engine.set(x, y, SPARK); return; } // 導電
+    // 導電: 雷、または電荷の残った火花に触れると光る。火花が消えたら泥に戻る。
+    // 電荷は伝わるたびに減るので、泥の層の中で電気は有限の範囲で止まる。
+    if (n === LIGHTNING && Math.random() > 0.6) { engine.set(x, y, SPARK); engine.meta[engine.idx(x, y)] = SPARK_MUD | MUD_CHARGE_STRIKE; return; }
+    if (n === SPARK && Math.random() > 0.6) {
+      const m = engine.meta[engine.idx(x+dx, y+dy)];
+      const charge = (m & (SPARK_WATER | SPARK_MUD)) ? (m & SPARK_CHARGE_MASK) : 0;
+      if (charge > 1) { engine.set(x, y, SPARK); engine.meta[engine.idx(x, y)] = SPARK_MUD | (charge - 1); return; }
+    }
     if (n === SNOW && Math.random() > 0.98) { engine.set(x+dx, y+dy, MUD); } // 雪→泥
   }
 
