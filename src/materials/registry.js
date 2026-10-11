@@ -3,7 +3,7 @@ import {
   GLASS, SOIL, SEED, PLANT, DARK_PLANT, FUNGUS, GLOW_FUNGUS, FLOWER, DARK_FLOWER,
   METAL, LIGHTNING, SPARK, RUST, STEAM, ACID, MUD, ICE, HARD_SOIL, ACID_PLANT,
   OBSIDIAN, SANDSTONE, BASALT, SPRING, LAVA_SPRING, SAKURA_SEED, SAKURA_TREE,
-  SAKURA_PETAL, FIREFLY, POLLEN, MA_VOID, KOI, KOI_BODY, VIBRATION, GOLD, KINTSUGI
+  SAKURA_PETAL, FIREFLY, POLLEN, MA_VOID, KOI, KOI_BODY, VIBRATION, GOLD, KINTSUGI, CLOUD
 } from './ids.js';
 import {
   FLOWER_COLORS, FLOWER_CENTER, DARK_F_COLORS, DARK_F_CENTER, ACID_STEM_COLS,
@@ -20,7 +20,7 @@ import {
   updateRust
 } from './life.js';
 import {
-  updateSteam, updateAcid, updateMud, updateIce
+  updateSteam, updateCloud, updateAcid, updateMud, updateIce
 } from './fluids.js';
 import {
   updateAcidPlant, updateObsidian, updateSandstone, updateBasalt, updateSpring,
@@ -91,6 +91,7 @@ export const MATERIALS = {
   [KOI_BODY]:     { name: 'koi_body',    colors: [...KOI_COLS],                                                         update: updateKoiBody     },
   [VIBRATION]:    { name: 'vibration',   colors: [...VIBRATION_COLS],                                                   update: updateVibration   },
   [GOLD]:         { name: 'gold',        colors: [...GOLD_COLS],                                                        update: updateGold        },
+  [CLOUD]:        { name: 'cloud',       colors: [0xF4F6FA,0xE6EAF2,0xDCE2EC,0xEEF1F7,0xD2D9E6,0xFAFBFD],             update: updateCloud       },
   [KINTSUGI]:     { name: 'kintsugi',    colors: [...KINTSUGI_COLS],                                                    update: updateKintsugi    },
 };
 

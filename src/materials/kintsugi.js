@@ -6,6 +6,10 @@ import {
   KINTSUGI_COLS
 } from './meta.js';
 
+// 近傍の方向表（関数のたびに配列を作らないよう、モジュールで 1 度だけ作る。中身は書き換えない）
+const NB0 = [[0,1],[1,0],[-1,0],[0,-1]];
+
+
 // ─── 金継ぎ (Kintsugi) update functions ──────────────────────────────────────
 //
 // GOLD     … 溶けた金。最重量級の粘性液体。割れ目（鉱物固体に2面以上挟まれた場所）
@@ -29,10 +33,10 @@ function _solidify(engine, x, y) {
 }
 
 export function updateGold(engine, x, y) {
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
+  const nb4 = NB0;
 
   // 急冷凝固: 氷・雪に触れた金は即座に固まる（溶岩→黒曜石と同じ作法で蒸気を出す）
-  for (const [dx,dy] of nb4) {
+  for (let _k1 = 0; _k1 < nb4.length; _k1++) { const dx = nb4[_k1][0], dy = nb4[_k1][1];
     const n = engine.get(x+dx, y+dy);
     if (n === ICE || n === SNOW) {
       engine.set(x+dx, y+dy, STEAM);
@@ -44,7 +48,7 @@ export function updateGold(engine, x, y) {
 
   // 割れ目凝固: 鉱物固体に2面以上挟まれていると 10%/frame で固まる
   let mineral = 0;
-  for (const [dx,dy] of nb4) {
+  for (let _k2 = 0; _k2 < nb4.length; _k2++) { const dx = nb4[_k2][0], dy = nb4[_k2][1];
     if (SEAM_BASE.includes(engine.get(x+dx, y+dy))) mineral++;
   }
   if (mineral >= 2 && Math.random() > 0.90) { _solidify(engine, x, y); return; }
@@ -65,8 +69,8 @@ export function updateGold(engine, x, y) {
 
 export function updateKintsugi(engine, x, y) {
   // 溶岩に触れると再溶解して金に戻る（10%/frame）
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx,dy] of nb4) {
+  const nb4 = NB0;
+  for (let _k3 = 0; _k3 < nb4.length; _k3++) { const dx = nb4[_k3][0], dy = nb4[_k3][1];
     if (engine.get(x+dx, y+dy) === LAVA && Math.random() > 0.90) {
       engine.set(x, y, GOLD);
       return;

@@ -12,6 +12,12 @@ import {
   FLOWER_CENTER
 } from './meta.js';
 
+// 近傍の方向表（関数のたびに配列を作らないよう、モジュールで 1 度だけ作る。中身は書き換えない）
+const NB0 = [[0,1],[1,0],[-1,0],[0,-1]];
+const NB1 = [[0,-1],[-1,-1],[1,-1],[-1,0],[1,0]];
+const NB2 = [[1,0],[-1,0],[0,1]];
+
+
 // ─── Life & growth update functions ──────────────────────────────────────────
 
 export function updateSoil(engine, x, y) {
@@ -69,8 +75,8 @@ export function updateSeed(engine, x, y) {
 
   // Heat kills seed（冬眠種は熱に耐える — 氷河期の力で押しのける）
   if (!isDormant) {
-    const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
-    for (const [dx,dy] of nb4) {
+    const nb4 = NB0;
+    for (let _k1 = 0; _k1 < nb4.length; _k1++) { const dx = nb4[_k1][0], dy = nb4[_k1][1];
       const n = engine.get(x+dx, y+dy);
       if (n === FIRE || n === LAVA) { engine.set(x, y, ASH); return; }
     }
@@ -144,7 +150,7 @@ export function updateSeed(engine, x, y) {
 
 export function updatePlant(engine, x, y) {
   const i   = engine.idx(x, y);
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
+  const nb4 = NB0;
 
   // 蛍の自然発生: 植物+水が近くにある時、0.05%/frame で出現
   if (Math.random() < 0.0005) {
@@ -155,8 +161,8 @@ export function updatePlant(engine, x, y) {
       }
     }
     if (nearWater) {
-      const spawnDirs = [[0,-1],[-1,-1],[1,-1],[-1,0],[1,0]];
-      for (const [sdx, sdy] of spawnDirs) {
+      const spawnDirs = NB1;
+      for (let _k2 = 0; _k2 < spawnDirs.length; _k2++) { const sdx = spawnDirs[_k2][0], sdy = spawnDirs[_k2][1];
         const sx = x+sdx, sy = y+sdy;
         if (engine.inBounds(sx, sy) && engine.get(sx, sy) === EMPTY) {
           const fi = engine.idx(sx, sy);
@@ -172,7 +178,7 @@ export function updatePlant(engine, x, y) {
   }
 
   // React to fire / lava → burn
-  for (const [dx,dy] of nb4) {
+  for (let _k3 = 0; _k3 < nb4.length; _k3++) { const dx = nb4[_k3][0], dy = nb4[_k3][1];
     const n = engine.get(x+dx, y+dy);
     if (n === FIRE || n === LAVA) { engine.set(x, y, FIRE); return; }
     // Oil contact → mutate to dark plant
@@ -237,12 +243,12 @@ export function updatePlant(engine, x, y) {
 
 export function updateDarkPlant(engine, x, y) {
   const i   = engine.idx(x, y);
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
+  const nb4 = NB0;
   const isCrystal = (engine.meta[i] & META_ICE_CRYSTAL) !== 0;
 
   // 氷晶化: ICE隣接 → 結晶フラグをセットして色を紺碧に更新（未結晶時のみ）
   if (!isCrystal) {
-    for (const [dx,dy] of nb4) {
+    for (let _k4 = 0; _k4 < nb4.length; _k4++) { const dx = nb4[_k4][0], dy = nb4[_k4][1];
       if (engine.get(x+dx, y+dy) === ICE && Math.random() > 0.85) {
         engine.meta[i] |= META_ICE_CRYSTAL;
         engine.colors[i] = ICE_CRYSTAL_STEM[Math.floor(Math.random() * ICE_CRYSTAL_STEM.length)];
@@ -252,7 +258,7 @@ export function updateDarkPlant(engine, x, y) {
   }
 
   // React to fire / lava → burn intensely（氷晶でも炎には負ける）
-  for (const [dx,dy] of nb4) {
+  for (let _k5 = 0; _k5 < nb4.length; _k5++) { const dx = nb4[_k5][0], dy = nb4[_k5][1];
     const n = engine.get(x+dx, y+dy);
     if (n === FIRE || n === LAVA) {
       engine.set(x, y, FIRE);
@@ -267,7 +273,7 @@ export function updateDarkPlant(engine, x, y) {
   if (isCrystal) return;
 
   // 酸変異: ACID隣接 → ACID_PLANT（感染する腐食林の起点）
-  for (const [dx,dy] of nb4) {
+  for (let _k6 = 0; _k6 < nb4.length; _k6++) { const dx = nb4[_k6][0], dy = nb4[_k6][1];
     if (engine.get(x+dx, y+dy) === ACID && Math.random() > 0.97) {
       engine.cells[i]  = ACID_PLANT;
       engine.colors[i] = ACID_STEM_COLS[Math.floor(Math.random() * ACID_STEM_COLS.length)];
@@ -278,8 +284,8 @@ export function updateDarkPlant(engine, x, y) {
 
   // Drip oil to nearby empty cells
   if (Math.random() > 0.997) {
-    const oilDirs = [[1,0],[-1,0],[0,1]];
-    for (const [dx,dy] of oilDirs) {
+    const oilDirs = NB2;
+    for (let _k7 = 0; _k7 < oilDirs.length; _k7++) { const dx = oilDirs[_k7][0], dy = oilDirs[_k7][1];
       if (engine.get(x+dx, y+dy) === EMPTY) { engine.set(x+dx, y+dy, OIL); break; }
     }
   }
@@ -290,7 +296,7 @@ export function updateDarkPlant(engine, x, y) {
   const growDirs = [[-1,-1],[1,-1],[0,-1]];
   growDirs.sort(() => Math.random() - 0.5); // shuffle
 
-  for (const [dx,dy] of growDirs) {
+  for (let _k8 = 0; _k8 < growDirs.length; _k8++) { const dx = growDirs[_k8][0], dy = growDirs[_k8][1];
     const nx = x+dx, ny = y+dy;
     if (!engine.inBounds(nx,ny) || engine.get(nx,ny) !== EMPTY) continue;
 
@@ -350,8 +356,8 @@ function _bloom(engine, x, y, meta, isDark) {
 }
 
 export function updateFungus(engine, x, y) {
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx,dy] of nb4) {
+  const nb4 = NB0;
+  for (let _k9 = 0; _k9 < nb4.length; _k9++) { const dx = nb4[_k9][0], dy = nb4[_k9][1];
     const n = engine.get(x+dx, y+dy);
     if (n === FIRE || n === LAVA)             { engine.set(x, y, EMPTY);      return; }
     if (n === ICE  && Math.random() > 0.95)   { engine.set(x, y, EMPTY);      return; } // 凍死
@@ -359,8 +365,8 @@ export function updateFungus(engine, x, y) {
   }
   if (Math.random() > 0.002) return;
 
-  const spreadDirs = [[1,0],[-1,0],[0,1]];
-  for (const [dx,dy] of spreadDirs) {
+  const spreadDirs = NB2;
+  for (let _k10 = 0; _k10 < spreadDirs.length; _k10++) { const dx = spreadDirs[_k10][0], dy = spreadDirs[_k10][1];
     const nx = x+dx, ny = y+dy;
     if (!engine.inBounds(nx,ny) || engine.get(nx,ny) !== EMPTY) continue;
     const bt = engine.get(nx, ny+1);
@@ -373,9 +379,9 @@ export function updateGlowFungus(engine, x, y) {
   const i = engine.idx(x, y);
   // 連鎖爆発フラグ（酸による死亡が隣接発光菌に伝播）
   if (engine.meta[i] === 255) {
-    engine.cells[i] = SPARK; engine.colors[i] = 0x00FFDD; engine.updated[i] = 1;
-    const nb4chain = [[0,1],[1,0],[-1,0],[0,-1]];
-    for (const [dx,dy] of nb4chain) {
+    engine.cells[i] = SPARK; engine.colors[i] = 0x00FFDD; engine.updated[i] = 1; engine.meta[i] = 0;
+    const nb4chain = NB0;
+    for (let _k11 = 0; _k11 < nb4chain.length; _k11++) { const dx = nb4chain[_k11][0], dy = nb4chain[_k11][1];
       const cx2 = x+dx, cy2 = y+dy;
       if (!engine.inBounds(cx2,cy2)) continue;
       if (engine.get(cx2,cy2) === GLOW_FUNGUS) engine.meta[engine.idx(cx2,cy2)] = 255;
@@ -395,8 +401,8 @@ export function updateGlowFungus(engine, x, y) {
   const resonTimer = engine.meta[i];
   if (resonTimer > 0) {
     // 致命的反応は共鳴中でも有効（燃えたり凍えたりはする）
-    const nb4r = [[0,1],[1,0],[-1,0],[0,-1]];
-    for (const [dx,dy] of nb4r) {
+    const nb4r = NB0;
+    for (let _k12 = 0; _k12 < nb4r.length; _k12++) { const dx = nb4r[_k12][0], dy = nb4r[_k12][1];
       const n = engine.get(x+dx, y+dy);
       if (n === FIRE || n === LAVA)           { engine.set(x, y, EMPTY); return; }
       if (n === ICE  && Math.random() > 0.90) { engine.set(x, y, EMPTY); return; }
@@ -417,8 +423,8 @@ export function updateGlowFungus(engine, x, y) {
     return; // 共鳴中は通常の成長・拡散をスキップ
   }
 
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx,dy] of nb4) {
+  const nb4 = NB0;
+  for (let _k13 = 0; _k13 < nb4.length; _k13++) { const dx = nb4[_k13][0], dy = nb4[_k13][1];
     const n = engine.get(x+dx, y+dy);
     if (n === FIRE || n === LAVA)          { engine.set(x, y, EMPTY); return; }
     if (n === ICE  && Math.random() > 0.90)  { engine.set(x, y, EMPTY); return; } // 凍死
@@ -426,13 +432,13 @@ export function updateGlowFungus(engine, x, y) {
   }
   // 蒸気が隣接していると超加速成長（高温多湿の洞窟）
   let glowNearSteam = false;
-  for (const [dx2,dy2] of nb4) { if (engine.get(x+dx2, y+dy2) === STEAM) { glowNearSteam = true; break; } }
+  for (let _k14 = 0; _k14 < nb4.length; _k14++) { const dx2 = nb4[_k14][0], dy2 = nb4[_k14][1]; if (engine.get(x+dx2, y+dy2) === STEAM) { glowNearSteam = true; break; } }
   if (Math.random() > (glowNearSteam ? 0.002 : 0.008)) return;
 
   const spreadDirs = glowNearSteam
     ? [[1,0],[-1,0],[0,1],[0,-1],[1,-1]] // 蒸気充満時は5方向へ拡散
     : [[1,0],[-1,0],[0,1]];
-  for (const [dx,dy] of spreadDirs) {
+  for (let _k15 = 0; _k15 < spreadDirs.length; _k15++) { const dx = spreadDirs[_k15][0], dy = spreadDirs[_k15][1];
     const nx = x+dx, ny = y+dy;
     if (!engine.inBounds(nx,ny)) continue;
     const target = engine.get(nx,ny);
@@ -446,8 +452,8 @@ export function updateGlowFungus(engine, x, y) {
 
 export function updateRust(engine, x, y) {
   // 雷 → 砂に崩壊、溶岩 → 溶解。隣接METALに錆伝播（0.5%）
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx,dy] of nb4) {
+  const nb4 = NB0;
+  for (let _k16 = 0; _k16 < nb4.length; _k16++) { const dx = nb4[_k16][0], dy = nb4[_k16][1];
     const n = engine.get(x+dx, y+dy);
     if (n === LIGHTNING) { engine.set(x, y, SAND); return; }
     if (n === LAVA)      { engine.set(x, y, LAVA); return; }

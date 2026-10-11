@@ -9,6 +9,22 @@
 <body>
   <canvas id="canvas"></canvas>
 
+  <!-- 温度ビュー（デバッグ）: ` キーで切替。凡例とカーソル位置の温度を表示する -->
+  <div id="debug-temp" hidden>
+    <div id="debug-temp-title">🌡 温度ビュー <small><kbd>T</kbd> か ⚙ 設定で切替</small></div>
+    <div id="debug-temp-readout">
+      <div id="dt-value">--</div>
+      <div id="dt-state">カーソルを盤面に合わせてください</div>
+      <div id="dt-info"></div>
+    </div>
+    <div id="debug-temp-barwrap">
+      <div id="debug-temp-bar"></div>
+      <div id="debug-temp-marker"></div>
+    </div>
+    <div id="debug-temp-ticks"></div>
+    <div id="debug-temp-note">白い線＝沸点・水色の線＝氷点　暗い面＝空気</div>
+  </div>
+
   <!-- Material hint toast (auto-dismiss) -->
   <div id="hint"></div>
 
@@ -29,21 +45,38 @@
       <span class="ctl-sep"></span>
       <button id="scenario-btn" class="ctl-btn" title="シナリオ">🎬</button>
       <button id="practice-btn" class="ctl-btn" title="実験帳 — 化学反応の練習">🧪</button>
+      <button id="speed-btn" class="ctl-btn" title="倍速（性能を測定中）">1×</button>
       <button id="rain-btn" class="ctl-btn" title="雨モード（トグル）">☁</button>
       <button id="sound-btn" class="ctl-btn" title="音（水琴窟）">🔔</button>
       <button id="chiri-btn" class="ctl-btn" title="散 — 風がすべてを掃き消す">🍃</button>
+      <button id="settings-btn" class="ctl-btn" title="設定">⚙</button>
       <button id="clear-btn" class="ctl-btn">クリア</button>
     </div>
   </div>
 
+  <!-- モーダル共通: .modal（背景）> .modal-box > .modal-header + 本文。
+       開閉・フォーカス・Esc・背景クリックは main.js の createModal が担当する。
+       閉じるボタンは data-modal-close を付ける。 -->
+
   <!-- Scenario modal -->
-  <div id="scenario-modal">
-    <div id="scenario-modal-box">
-      <div id="scenario-modal-header">
-        <span id="scenario-modal-title">シナリオを選ぶ</span>
-        <button id="scenario-modal-close">✕</button>
+  <div id="scenario-modal" class="modal" aria-hidden="true">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="scenario-modal-title" tabindex="-1">
+      <div class="modal-header">
+        <span id="scenario-modal-title" class="modal-title">シナリオを選ぶ</span>
+        <button class="modal-close" data-modal-close aria-label="閉じる">✕</button>
       </div>
       <div id="scenario-list"></div>
+    </div>
+  </div>
+
+  <!-- 設定画面: 項目は main.js の SETTINGS から描画する -->
+  <div id="settings-modal" class="modal" aria-hidden="true">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title" tabindex="-1">
+      <div class="modal-header">
+        <span id="settings-modal-title" class="modal-title">設定</span>
+        <button class="modal-close" data-modal-close aria-label="閉じる">✕</button>
+      </div>
+      <div id="settings-list"></div>
     </div>
   </div>
 

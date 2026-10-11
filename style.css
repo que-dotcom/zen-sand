@@ -196,6 +196,63 @@ rt {
   color: rgba(255, 255, 255, 0.8);
 }
 
+/* 温度ビュー（デバッグ）の凡例 */
+#debug-temp {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  width: 280px;
+  padding: 10px 12px 8px;
+  background: rgba(10, 10, 10, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.88);
+  font: 12px/1.5 ui-monospace, Menlo, monospace;
+  pointer-events: none;
+  z-index: 12;
+}
+#debug-temp[hidden] { display: none; }
+#debug-temp-title { font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+#debug-temp-title small { font-weight: 400; color: rgba(255,255,255,0.5); margin-left: 6px; }
+#dt-value { font-size: 30px; line-height: 1.1; font-weight: 700; letter-spacing: 0.02em; }
+#dt-value small { font-size: 12px; font-weight: 400; margin-left: 4px; color: rgba(255,255,255,0.6); }
+#dt-state { font-size: 13px; margin: 2px 0 2px; min-height: 20px; }
+#dt-info { font-size: 11px; color: rgba(255,255,255,0.6); white-space: pre; min-height: 50px; }
+#debug-temp-barwrap { position: relative; margin-top: 6px; padding-top: 10px; }
+#debug-temp-bar { height: 12px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.25); }
+#debug-temp-marker {
+  position: absolute;
+  top: 0;
+  width: 0;
+  height: 0;
+  margin-left: -6px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 9px solid #fff;
+  filter: drop-shadow(0 0 2px #000);
+  display: none;
+}
+#debug-temp-ticks { position: relative; height: 36px; }
+#debug-temp-ticks span {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 10px;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.75);
+}
+#debug-temp-ticks span::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -5px;
+  width: 1px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.7);
+}
+#debug-temp-note { font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+
 /* Material hint toast (auto-dismiss) */
 #hint {
   position: fixed;
@@ -251,7 +308,7 @@ rt {
 }
 
 /* Scenario modal overlay */
-#scenario-modal {
+.modal {
   display: none;
   position: fixed;
   inset: 0;
@@ -263,7 +320,7 @@ rt {
   justify-content: center;
 }
 
-#scenario-modal.show {
+.modal.show {
   display: flex;
 }
 
@@ -361,7 +418,8 @@ rt {
   color: rgba(255, 255, 255, 0.75);
 }
 
-#scenario-modal-box {
+.modal-box {
+  outline: none;
   background: rgba(14, 14, 20, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 18px;
@@ -372,7 +430,7 @@ rt {
   flex-direction: column;
 }
 
-#scenario-modal-header {
+.modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -380,14 +438,14 @@ rt {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-#scenario-modal-title {
+.modal-title {
   color: rgba(255, 255, 255, 0.75);
   font-size: 14px;
   font-weight: 500;
   letter-spacing: 0.05em;
 }
 
-#scenario-modal-close {
+.modal-close {
   background: transparent;
   border: none;
   color: rgba(255, 255, 255, 0.35);
@@ -398,7 +456,8 @@ rt {
   transition: color 0.15s ease;
 }
 
-#scenario-modal-close:hover {
+.modal-close:hover,
+.modal-close:focus-visible {
   color: rgba(255, 255, 255, 0.8);
 }
 
@@ -541,4 +600,189 @@ rt {
     padding: 7px 12px;
     font-size: 15px;
   }
+}
+
+/* ─── 設定画面 ────────────────────────────────────────────────────────────── */
+#settings-list {
+  overflow-y: auto;
+  padding: 8px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-section {
+  margin: 8px 4px 0;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.settings-row:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.settings-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-name {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 14px;
+}
+
+.settings-desc {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* トグルスイッチ（チェックボックスを見た目だけ置き換える） */
+.settings-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  position: relative;
+  width: 42px;
+  height: 24px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.settings-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s ease;
+}
+
+.settings-switch:checked {
+  background: #ff8a3a;
+}
+
+.settings-switch:checked::after {
+  transform: translateX(18px);
+}
+
+.settings-switch:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 2px;
+}
+
+/* キーボードショートカットの表示 */
+.settings-key,
+#debug-temp-title kbd {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 2px;
+  padding: 0 5px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  font: 11px/1.5 ui-monospace, Menlo, monospace;
+  text-align: center;
+}
+
+/* 設定画面: スライダー項目 */
+.settings-row-range {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  cursor: default;
+}
+
+.settings-range {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.settings-slider {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 22px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* 軌道は気温の色（冷たい青 → 常温 → 暑い赤）にして、どちら向きが暑いかが見て分かるようにする */
+.settings-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, #2a4fd0, #28b8c0 30%, #6fcf6a 50%, #f2e35a 70%, #ff8a3a 85%, #e8402a);
+}
+.settings-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, #2a4fd0, #28b8c0 30%, #6fcf6a 50%, #f2e35a 70%, #ff8a3a 85%, #e8402a);
+}
+.settings-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+}
+.settings-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid rgba(0, 0, 0, 0.5);
+}
+.settings-slider:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 3px;
+}
+
+.settings-value {
+  color: rgba(255, 255, 255, 0.88);
+  font: 13px/1.4 ui-monospace, Menlo, monospace;
+}
+
+.settings-reset {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 3px 10px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.settings-reset:hover,
+.settings-reset:focus-visible {
+  color: rgba(255, 255, 255, 0.95);
+  border-color: rgba(255, 255, 255, 0.45);
 }

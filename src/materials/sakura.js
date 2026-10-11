@@ -12,6 +12,12 @@ import {
   _emitPollen
 } from './pollen.js';
 
+// 近傍の方向表（関数のたびに配列を作らないよう、モジュールで 1 度だけ作る。中身は書き換えない）
+const NB0 = [[0,1],[1,0],[-1,0],[0,-1]];
+const NB1 = [[-2,-1],[-1,-2],[0,-2],[1,-2],[2,-1],[-1,-1],[1,-1],[-2,0],[2,0]];
+const NB2 = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[1,1],[0,1]];
+
+
 // ─── Wabi-Sabi update functions ───────────────────────────────────────────────
 
 export function updateSakuraSeed(engine, x, y) {
@@ -24,8 +30,8 @@ export function updateSakuraSeed(engine, x, y) {
   if (dB === EMPTY || dB === WATER) { engine.swap(x, y, x-dir, y+1); return; }
 
   // 火/溶岩に触れると焼失
-  const nb4s = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx,dy] of nb4s) {
+  const nb4s = NB0;
+  for (let _k1 = 0; _k1 < nb4s.length; _k1++) { const dx = nb4s[_k1][0], dy = nb4s[_k1][1];
     const n = engine.get(x+dx, y+dy);
     if (n === FIRE || n === LAVA) { engine.set(x, y, ASH); return; }
   }
@@ -67,8 +73,8 @@ export function updateSakuraTree(engine, x, y) {
   const meta = engine.meta[i];
 
   // 火・溶岩 → 燃焼
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx,dy] of nb4) {
+  const nb4 = NB0;
+  for (let _k2 = 0; _k2 < nb4.length; _k2++) { const dx = nb4[_k2][0], dy = nb4[_k2][1];
     const n = engine.get(x+dx, y+dy);
     if (n === FIRE || n === LAVA)              { engine.set(x, y, FIRE); return; }
     if (n === ACID && Math.random() > 0.97)    { engine.set(x, y, ASH);  return; }
@@ -128,7 +134,7 @@ export function updateSakuraTree(engine, x, y) {
     if (Math.random() > 0.018) return; // 1.8%/frame で花びらを放出
 
     // 周囲の空きセルに SAKURA_PETAL を生成
-    const petalDirs = [[-2,-1],[-1,-2],[0,-2],[1,-2],[2,-1],[-1,-1],[1,-1],[-2,0],[2,0]];
+    const petalDirs = NB1;
     const pd = petalDirs[Math.floor(Math.random() * petalDirs.length)];
     const px = x+pd[0], py = y+pd[1];
     if (!engine.inBounds(px,py) || engine.get(px,py) !== EMPTY) return;
@@ -154,7 +160,7 @@ export function updateSakuraTree(engine, x, y) {
 
     // 最後の花びらを散らす
     if (Math.random() > 0.025) return;
-    const petalDirs = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[1,1],[0,1]];
+    const petalDirs = NB2;
     const pd = petalDirs[Math.floor(Math.random() * petalDirs.length)];
     const px = x+pd[0], py = y+pd[1];
     if (!engine.inBounds(px,py) || engine.get(px,py) !== EMPTY) return;
@@ -185,9 +191,9 @@ export function updateSakuraPetal(engine, x, y) {
 
   // ──── ④ 凍結状態の処理 ─────────────────────────────────────────────────────
   if (isFrozen) {
-    const nb4f = [[0,1],[1,0],[-1,0],[0,-1]];
+    const nb4f = NB0;
     let hasIce = false, hasHeat = false;
-    for (const [dx,dy] of nb4f) {
+    for (let _k3 = 0; _k3 < nb4f.length; _k3++) { const dx = nb4f[_k3][0], dy = nb4f[_k3][1];
       const n = engine.get(x+dx, y+dy);
       if (n === ICE)                hasIce  = true;
       if (n === FIRE || n === LAVA) hasHeat = true;
@@ -201,8 +207,8 @@ export function updateSakuraPetal(engine, x, y) {
   }
 
   // ──── 通常状態 ─────────────────────────────────────────────────────────────
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx,dy] of nb4) {
+  const nb4 = NB0;
+  for (let _k4 = 0; _k4 < nb4.length; _k4++) { const dx = nb4[_k4][0], dy = nb4[_k4][1];
     const n = engine.get(x+dx, y+dy);
     if (n === FIRE || n === LAVA) { engine.set(x, y, EMPTY); return; }
     // ④ 氷封の花: ICE に触れると凍結フラグ (bit 7) をセットして静止
@@ -294,8 +300,8 @@ export function updateFirefly(engine, x, y) {
   if (Math.random() < 0.0025) { engine.set(x, y, EMPTY); return; }
 
   // 火・溶岩・GLOW_FUNGUS の隣接チェック
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx,dy] of nb4) {
+  const nb4 = NB0;
+  for (let _k5 = 0; _k5 < nb4.length; _k5++) { const dx = nb4[_k5][0], dy = nb4[_k5][1];
     const n = engine.get(x+dx, y+dy);
     if (n === FIRE || n === LAVA) { engine.set(x, y, EMPTY); return; }
     // ⑦ 蛍と発光菌の共鳴: GLOW_FUNGUS に触れると光を手渡して儚く消える（一期一会）

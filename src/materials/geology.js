@@ -6,13 +6,19 @@ import {
   ACID_STEM_COLS, DARK_STEM_COLS, ACID_FLOWER_COLS
 } from './meta.js';
 
+// 近傍の方向表（関数のたびに配列を作らないよう、モジュールで 1 度だけ作る。中身は書き換えない）
+const NB0 = [[0,1],[1,0],[-1,0],[0,-1]];
+const NB1 = [[0,-1],[1,0],[-1,0],[0,1],[1,-1],[-1,-1]];
+const NB2 = [[1,0],[-1,0],[0,1]];
+
+
 // ─── P3 素材 update functions ─────────────────────────────────────────────────
 
 export function updateAcidPlant(engine, x, y) {
   const i   = engine.idx(x, y);
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
+  const nb4 = NB0;
 
-  for (const [dx,dy] of nb4) {
+  for (let _k1 = 0; _k1 < nb4.length; _k1++) { const dx = nb4[_k1][0], dy = nb4[_k1][1];
     const nx2 = x+dx, ny2 = y+dy;
     const n   = engine.get(nx2, ny2);
     // 感染: 隣接する通常植物・暗黒植物を腐食植物に変える
@@ -32,7 +38,7 @@ export function updateAcidPlant(engine, x, y) {
     // 火・溶岩で燃焼 → 酸の飛沫を散らす
     if ((n === FIRE || n === LAVA) && Math.random() > 0.5) {
       engine.set(x, y, FIRE);
-      for (const [sdx,sdy] of [[0,-1],[1,0],[-1,0],[0,1],[1,-1],[-1,-1]]) {
+      for (let _k2 = 0; _k2 < NB1.length; _k2++) { const sdx = NB1[_k2][0], sdy = NB1[_k2][1];
         const sx=x+sdx, sy=y+sdy;
         if (engine.inBounds(sx,sy) && engine.get(sx,sy) === EMPTY && Math.random() > 0.6) {
           engine.set(sx, sy, ACID);
@@ -46,7 +52,7 @@ export function updateAcidPlant(engine, x, y) {
 
   // 酸を少量分泌 (0.3%/frame)
   if (Math.random() > 0.997) {
-    for (const [dx,dy] of [[1,0],[-1,0],[0,1]]) {
+    for (let _k3 = 0; _k3 < NB2.length; _k3++) { const dx = NB2[_k3][0], dy = NB2[_k3][1];
       if (engine.inBounds(x+dx,y+dy) && engine.get(x+dx, y+dy) === EMPTY) {
         engine.set(x+dx, y+dy, ACID); break;
       }
@@ -57,7 +63,7 @@ export function updateAcidPlant(engine, x, y) {
   if (Math.random() > 0.02) return;
   const growDirs = [[-1,-1],[1,-1],[0,-1]];
   growDirs.sort(() => Math.random() - 0.5);
-  for (const [dx,dy] of growDirs) {
+  for (let _k4 = 0; _k4 < growDirs.length; _k4++) { const dx = growDirs[_k4][0], dy = growDirs[_k4][1];
     const gx = x+dx, gy = y+dy;
     if (!engine.inBounds(gx,gy) || engine.get(gx,gy) !== EMPTY) continue;
     const meta = engine.meta[i];
@@ -79,8 +85,8 @@ export function updateAcidPlant(engine, x, y) {
 export function updateSpring(engine, x, y) {
   // 水源: 3%/frame で隣接EMPTYにWATERを生成する永久水源
   if (Math.random() > 0.03) return;
-  const dirs = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx,dy] of dirs) {
+  const dirs = NB0;
+  for (let _k5 = 0; _k5 < dirs.length; _k5++) { const dx = dirs[_k5][0], dy = dirs[_k5][1];
     const nx = x+dx, ny = y+dy;
     if (engine.inBounds(nx,ny) && engine.get(nx,ny) === EMPTY) {
       engine.set(nx, ny, WATER);
@@ -92,8 +98,8 @@ export function updateSpring(engine, x, y) {
 export function updateLavaSpring(engine, x, y) {
   // 溶岩源泉（地熱噴出口）: WATERが隣接すれば直接STEAMに変換（STONEを作らない）
   // → 永久水循環シナリオでSTONEが詰まる問題を防ぐ
-  const dirs = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx,dy] of dirs) {
+  const dirs = NB0;
+  for (let _k6 = 0; _k6 < dirs.length; _k6++) { const dx = dirs[_k6][0], dy = dirs[_k6][1];
     const nx = x+dx, ny = y+dy;
     if (engine.inBounds(nx,ny) && engine.get(nx,ny) === WATER) {
       if (Math.random() > 0.02) return;
@@ -103,7 +109,7 @@ export function updateLavaSpring(engine, x, y) {
   }
   // 水がない場合: 通常の溶岩噴出（2%/frame）
   if (Math.random() > 0.02) return;
-  for (const [dx,dy] of dirs) {
+  for (let _k7 = 0; _k7 < dirs.length; _k7++) { const dx = dirs[_k7][0], dy = dirs[_k7][1];
     const nx = x+dx, ny = y+dy;
     if (engine.inBounds(nx,ny) && engine.get(nx,ny) === EMPTY) {
       engine.set(nx, ny, LAVA);
@@ -116,8 +122,8 @@ export function updateObsidian(engine, x, y) {
   // 黒曜石: 溶岩でのみ溶ける。酸・雷・水に完全耐性
   // 再溶融は 0.3%/frame とごく遅い。3% だと「石は残るのに黒曜石は溶岩に食われて
   // 消える」非対称で、溶岩+冷却系が必ず全部石に収束してしまう（急冷の見せ場が消える）
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx,dy] of nb4) {
+  const nb4 = NB0;
+  for (let _k8 = 0; _k8 < nb4.length; _k8++) { const dx = nb4[_k8][0], dy = nb4[_k8][1];
     if (engine.get(x+dx, y+dy) === LAVA && Math.random() > 0.997) {
       engine.set(x, y, LAVA); return;
     }
@@ -126,8 +132,8 @@ export function updateObsidian(engine, x, y) {
 
 export function updateSandstone(engine, x, y) {
   // 砂岩: 水でじわじわ侵食→砂、酸で速く溶ける、溶岩で再加熱→ガラス
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx,dy] of nb4) {
+  const nb4 = NB0;
+  for (let _k9 = 0; _k9 < nb4.length; _k9++) { const dx = nb4[_k9][0], dy = nb4[_k9][1];
     const n = engine.get(x+dx, y+dy);
     if (n === WATER && Math.random() > 0.9995) { engine.set(x, y, SAND);  return; } // 水侵食（崖崩れ）
     if (n === LAVA  && Math.random() > 0.98)   { engine.set(x, y, GLASS); return; } // 再加熱→ガラス
@@ -136,8 +142,8 @@ export function updateSandstone(engine, x, y) {
 
 export function updateBasalt(engine, x, y) {
   // 玄武岩: 溶岩で再溶融、酸で泥化
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx,dy] of nb4) {
+  const nb4 = NB0;
+  for (let _k10 = 0; _k10 < nb4.length; _k10++) { const dx = nb4[_k10][0], dy = nb4[_k10][1];
     const n = engine.get(x+dx, y+dy);
     if (n === LAVA && Math.random() > 0.98) { engine.set(x, y, LAVA); return; }
     if (n === ACID && Math.random() > 0.97) { engine.set(x, y, MUD);  return; } // 酸+玄武岩→泥（鉱物溶出）

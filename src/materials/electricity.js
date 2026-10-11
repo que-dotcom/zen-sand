@@ -6,11 +6,18 @@ import {
 } from './ids.js';
 import {
   META_ICE_CRYSTAL, SAKURA_BLOOM_COLS, CONDUCTOR_IDS, VIB_STR_SHIFT, VIBRATION_COLS,
-  VIB_DIR_SHIFT, VIB_DIRS, VIB_MAT_MASK, VIB_DIR_MASK, VIB_STR_MASK, META_DORMANT
+  SPARK_CHARGE_MASK, SPARK_WATER, SPARK_MUD, VIB_DIR_SHIFT, VIB_DIRS, VIB_MAT_MASK, VIB_DIR_MASK, VIB_STR_MASK, META_DORMANT
 } from './meta.js';
 import {
   MATERIALS
 } from './registry.js';
+
+// 近傍の方向表（関数のたびに配列を作らないよう、モジュールで 1 度だけ作る。中身は書き換えない）
+const NB0 = [[0,1],[1,0],[-1,0],[0,-1]];
+const NB1 = [[0,1],[1,0],[-1,0],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
+const NB2 = [[0,-1],[1,0],[-1,0]];
+const NB3 = [[0,-1],[1,0],[-1,0],[0,1],[1,-1],[-1,-1]];
+
 
 // ─── Electricity update functions ────────────────────────────────────────────
 
@@ -23,8 +30,8 @@ export function updateMetal(engine, x, y) {
   if ((dA === EMPTY || dA === WATER) && Math.random() > 0.35) { engine.swap(x, y, x+dir, y+1); return; }
   if ((dB === EMPTY || dB === WATER) && Math.random() > 0.35) { engine.swap(x, y, x-dir, y+1); return; }
   // Lava melts metal → becomes lava
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx,dy] of nb4) {
+  const nb4 = NB0;
+  for (let _k1 = 0; _k1 < nb4.length; _k1++) { const dx = nb4[_k1][0], dy = nb4[_k1][1];
     if (engine.get(x+dx, y+dy) === LAVA && Math.random() > 0.94) {
       engine.set(x, y, LAVA); return;
     }
@@ -33,7 +40,7 @@ export function updateMetal(engine, x, y) {
   {
     const mi = engine.idx(x, y);
     let nearIce = false;
-    for (const [dx,dy] of nb4) {
+    for (let _k2 = 0; _k2 < nb4.length; _k2++) { const dx = nb4[_k2][0], dy = nb4[_k2][1];
       if (engine.get(x+dx, y+dy) === ICE) { nearIce = true; break; }
     }
     if (nearIce && engine.meta[mi] === 0) {
@@ -46,7 +53,7 @@ export function updateMetal(engine, x, y) {
   }
   // 水/泥に長時間接触 → 錆（泥はより速い）
   if (Math.random() > 0.998) {
-    for (const [dx,dy] of nb4) {
+    for (let _k3 = 0; _k3 < nb4.length; _k3++) { const dx = nb4[_k3][0], dy = nb4[_k3][1];
       const wn = engine.get(x+dx, y+dy);
       if (wn === WATER)              { engine.set(x, y, RUST); return; }
       if (wn === MUD && Math.random() > 0.4) { engine.set(x, y, RUST); return; } // 泥は0.3%速
@@ -54,10 +61,14 @@ export function updateMetal(engine, x, y) {
   }
 }
 
+// 水中の火花は電荷（meta）を持ち、隣の水へ広がるたびに 1 ずつ減る。電荷が尽きた火花は広がらず、水に戻る。
+// （電荷がないと、広がる速さが消える速さを上回って、池全体が火花のまま戻らなくなる）
+const SPARK_CHARGE_STRIKE = 24; // 雷が水に直撃したときの電荷（≒ 電気が届く距離）
+
 // 雷の隣接反応ヘルパー（進行中・着地点で共用）
 function _lightningReact(engine, x, y) {
-  const dirs = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx,dy] of dirs) {
+  const dirs = NB0;
+  for (let _k4 = 0; _k4 < dirs.length; _k4++) { const dx = dirs[_k4][0], dy = dirs[_k4][1];
     const nx = x+dx, ny = y+dy;
     const n  = engine.get(nx, ny);
     const ni = engine.idx(nx, ny);
@@ -70,8 +81,8 @@ function _lightningReact(engine, x, y) {
       engine.meta[ni]   = 5 + Math.floor(Math.random() * 3);
       if (isSupercooled) {
         // 分岐チェーン: 超冷却金属から枝分かれ伝播
-        const branchDirs = [[0,1],[1,0],[-1,0],[0,-1]];
-        for (const [bdx,bdy] of branchDirs) {
+        const branchDirs = NB0;
+        for (let _k5 = 0; _k5 < branchDirs.length; _k5++) { const bdx = branchDirs[_k5][0], bdy = branchDirs[_k5][1];
           const bx=nx+bdx, by=ny+bdy;
           if (!engine.inBounds(bx,by)) continue;
           const bn = engine.get(bx,by), bi = engine.idx(bx,by);
@@ -88,6 +99,7 @@ function _lightningReact(engine, x, y) {
     } else if (n === WATER) {
       engine.cells[ni]   = SPARK;
       engine.colors[ni]  = MATERIALS[SPARK].colors[Math.floor(Math.random() * MATERIALS[SPARK].colors.length)];
+      engine.meta[ni]    = SPARK_WATER | SPARK_CHARGE_STRIKE;
       engine.updated[ni] = 1;
     } else if (n === SAND   && Math.random() > 0.25) { engine.set(nx, ny, GLASS); }
     else if (n === OIL) {
@@ -105,7 +117,7 @@ function _lightningReact(engine, x, y) {
     else if (n === RUST)                              { engine.set(nx, ny, SAND);  } // 錆が砂に崩壊
     else if (n === ICE) {
       engine.set(nx, ny, WATER);
-      for (const [sdx,sdy] of [[0,-1],[1,0],[-1,0]]) {
+      for (let _k6 = 0; _k6 < NB2.length; _k6++) { const sdx = NB2[_k6][0], sdy = NB2[_k6][1];
         const px=nx+sdx, py=ny+sdy;
         if (engine.inBounds(px,py) && engine.get(px,py) === EMPTY) { engine.set(px,py,SPARK); }
       }
@@ -113,6 +125,7 @@ function _lightningReact(engine, x, y) {
     else if (n === MUD) {
       const mi = engine.idx(nx, ny);
       engine.cells[mi] = SPARK; engine.colors[mi] = MATERIALS[SPARK].colors[0]; engine.updated[mi] = 1;
+      engine.meta[mi] = SPARK_MUD | 12; // 泥は導電で光るだけ。火花が消えたら泥に戻る
     }
     else if (n === STEAM) { engine.set(nx, ny, WATER); }
     else if (n === PLANT || n === FLOWER || n === DARK_FLOWER) { engine.set(nx, ny, FIRE); }
@@ -121,17 +134,18 @@ function _lightningReact(engine, x, y) {
       if (engine.meta[dpi] & META_ICE_CRYSTAL) {
         // 氷晶粉砕 → SPARK + 周囲に水が飛び散る
         engine.cells[dpi]   = SPARK;
+        engine.meta[dpi]    = 0;
         engine.colors[dpi]  = 0xAAEEFF;
         engine.updated[dpi] = 1;
-        for (const [wdx,wdy] of [[0,-1],[1,0],[-1,0],[0,1],[1,-1],[-1,-1]]) {
+        for (let _k7 = 0; _k7 < NB3.length; _k7++) { const wdx = NB3[_k7][0], wdy = NB3[_k7][1];
           const wp=nx+wdx, wq=ny+wdy;
           if (engine.inBounds(wp,wq) && engine.get(wp,wq) === EMPTY) engine.set(wp, wq, WATER);
         }
       } else {
         // F+: 激しく発火 + 8方向に飛び火
         engine.set(nx, ny, FIRE);
-        const sd = [[0,1],[1,0],[-1,0],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
-        for (const [sdx,sdy] of sd) {
+        const sd = NB1;
+        for (let _k8 = 0; _k8 < sd.length; _k8++) { const sdx = sd[_k8][0], sdy = sd[_k8][1];
           const sn = engine.get(nx+sdx, ny+sdy);
           if (sn === EMPTY || sn === OIL || sn === PLANT || sn === FLOWER) engine.set(nx+sdx, ny+sdy, FIRE);
         }
@@ -146,7 +160,7 @@ function _lightningReact(engine, x, y) {
         const bn = engine.get(nx+bx, ny+by);
         if (bn === EMPTY || bn === GLOW_FUNGUS || bn === FUNGUS) {
           const bi = engine.idx(nx+bx, ny+by);
-          engine.cells[bi] = SPARK; engine.colors[bi] = 0x00FFDD; engine.updated[bi] = 1;
+          engine.cells[bi] = SPARK; engine.colors[bi] = 0x00FFDD; engine.updated[bi] = 1; engine.meta[bi] = 0;
         }
       }
       engine.set(nx, ny, EMPTY);
@@ -163,7 +177,7 @@ function _lightningReact(engine, x, y) {
         [-1,-1],[0,-1],[1,-1],[-2, 0],[2, 0],
         [-1, 1],[0, 1],[1, 1],[-2, 1],[2, 1],
       ];
-      for (const [bdx,bdy] of raikenDirs) {
+      for (let _k9 = 0; _k9 < raikenDirs.length; _k9++) { const bdx = raikenDirs[_k9][0], bdy = raikenDirs[_k9][1];
         const bx = nx+bdx, by = ny+bdy;
         if (!engine.inBounds(bx,by) || engine.get(bx,by) !== EMPTY) continue;
         if (Math.random() > 0.55) continue;
@@ -262,17 +276,25 @@ export function updateLightning(engine, x, y) {
 }
 export function updateSpark(engine, x, y) {
   // Fade back to water quickly
-  if (Math.random() > 0.82) { engine.set(x, y, WATER); return; }
+  const m = engine.meta[engine.idx(x, y)];
+  if (Math.random() > 0.82) {
+    const back = (m & SPARK_WATER) ? WATER : (m & SPARK_MUD) ? MUD : EMPTY;
+    engine.set(x, y, back);
+    return;
+  }
 
   // Spread electric wave through adjacent water (one generation per frame)
+  const charge = (m & SPARK_WATER) ? (m & SPARK_CHARGE_MASK) : 0; // 水へ広がるのは水の火花だけ（泥は泥の側で受け取る）
+  if (charge <= 1) return; // 電荷が尽きた火花は広がらない
   if (Math.random() > 0.6) return;
-  const nb4 = [[0,1],[1,0],[-1,0],[0,-1]];
-  for (const [dx,dy] of nb4) {
+  const nb4 = NB0;
+  for (let _k10 = 0; _k10 < nb4.length; _k10++) { const dx = nb4[_k10][0], dy = nb4[_k10][1];
     const nx = x+dx, ny = y+dy;
     if (engine.get(nx, ny) === WATER) {
       const ni = engine.idx(nx, ny);
       engine.cells[ni]   = SPARK;
       engine.colors[ni]  = MATERIALS[SPARK].colors[Math.floor(Math.random() * MATERIALS[SPARK].colors.length)];
+      engine.meta[ni]    = SPARK_WATER | (charge - 1);
       engine.updated[ni] = 1; // one step per frame = visible wave front
     }
   }
